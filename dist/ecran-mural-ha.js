@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.14';
+const EM_VERSION = '0.1.15';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -696,7 +696,6 @@ class EcranMuralCard extends HTMLElement {
         if (t > now.getTime()) break;
         let v = null;
         pts.forEach((p) => { if (p.t <= t) v = p.v; });
-        if (v == null && pts.length) v = pts[0].v;
         if (v != null) out[t] = v;
       }
       this._wHist = out;
