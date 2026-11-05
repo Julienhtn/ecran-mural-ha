@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.23';
+const EM_VERSION = '0.1.24';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1236,7 +1236,11 @@ class EcranMuralCard extends HTMLElement {
     const targets = which === 'all' ? (call.targets || []) : [(call.targets || [])[Number(which)]].filter(Boolean);
     if (!call.room) { this._toast('Aucune salle de visio configurée (call.room)'); return; }
     // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
-    const jitsi = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.startAudioMuted=99&config.startVideoMuted=99&config.startAudioOnly=false&config.startSilent=false&config.disableInitialGUM=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
+    const direct = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
+    // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
+    const base = await this._httpsBase();
+    const relayPath = call.relay_path || '/local/community/ecran-mural-ha/visio.html';
+    const jitsi = (name) => (base ? `${base}${relayPath}?room=${encodeURIComponent(call.room)}&name=${encodeURIComponent(name)}` : direct(name));
     this._callTargets = targets;
     for (const t of targets) {
       if (!t.notify) continue;
@@ -1254,6 +1258,18 @@ class EcranMuralCard extends HTMLElement {
       this.$.callFrame.innerHTML = '<div class="call-ext">La visio s’ouvre dans une fenêtre à part.<br>Revenez ici pour raccrocher.</div>';
       window.open(jitsi(call.name || 'Maison'), '_blank');
     }
+  }
+
+  async _httpsBase() {
+    const call = this._config.call || {};
+    if (call.relay_base) return String(call.relay_base).replace(/\/$/, '');
+    if (location.protocol === 'https:') return location.origin;
+    if (this._remoteBase !== undefined) return this._remoteBase;
+    try {
+      const st = await this._hass.callWS({ type: 'cloud/status' });
+      this._remoteBase = st && st.remote_domain && st.remote_enabled !== false ? `https://${st.remote_domain}` : null;
+    } catch (e) { this._remoteBase = null; }
+    return this._remoteBase;
   }
 
   async _hangup() {

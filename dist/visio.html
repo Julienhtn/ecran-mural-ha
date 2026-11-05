@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Visio maison</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0B0C0E; color: #F2F1EE; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #meet { position: fixed; inset: 0; }
+  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 18px; color: #A3A6AD; }
+</style>
+</head>
+<body>
+<div id="msg">Connexion à l’appel…</div>
+<div id="meet"></div>
+<script>
+// Page relais servie par Home Assistant : ouvre la salle Jitsi avec micro et caméra allumés d'office.
+// Paramètres : ?room=<url https de la salle>&name=<nom affiché>
+(function () {
+  var p = new URLSearchParams(location.search);
+  var room = p.get('room') || '';
+  var name = p.get('name') || 'Invité';
+  var m = room.match(/^https:\/\/([^\/]+)\/([^\/?#]+)$/);
+  var msg = document.getElementById('msg');
+  if (!m) { msg.textContent = 'Lien d’appel invalide.'; return; }
+  var domain = m[1], roomName = decodeURIComponent(m[2]);
+  var s = document.createElement('script');
+  s.src = 'https://' + domain + '/external_api.js';
+  s.onerror = function () { location.href = room; };
+  s.onload = function () {
+    msg.style.display = 'none';
+    var api = new JitsiMeetExternalAPI(domain, {
+      roomName: roomName,
+      parentNode: document.getElementById('meet'),
+      width: '100%', height: '100%',
+      userInfo: { displayName: name },
+      configOverwrite: {
+        prejoinConfig: { enabled: false }, prejoinPageEnabled: false,
+        startWithAudioMuted: false, startWithVideoMuted: false,
+        startAudioMuted: 99, startVideoMuted: 99, disableDeepLinking: true
+      },
+      interfaceConfigOverwrite: { MOBILE_APP_PROMO: false }
+    });
+    // Le serveur coupe la capture au démarrage : on allume micro et caméra dès l'entrée dans l'appel.
+    api.addListener('videoConferenceJoined', function () {
+      setTimeout(function () {
+        api.isAudioMuted().then(function (mu) { if (mu) api.executeCommand('toggleAudio'); });
+        api.isVideoMuted().then(function (mu) { if (mu) api.executeCommand('toggleVideo'); });
+      }, 600);
+    });
+    api.addListener('readyToClose', function () { try { window.close(); } catch (e) {} });
+  };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
