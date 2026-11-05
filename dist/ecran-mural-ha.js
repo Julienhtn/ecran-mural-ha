@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.29';
+const EM_VERSION = '0.1.30';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -151,7 +151,8 @@ class EcranMuralCard extends HTMLElement {
       const cam = (c.cameras || [])[i];
       if (!cam) return '';
       return `<button class="cam press" data-act="cam" data-i="${i}" aria-label="Agrandir ${emEsc(cam.name)}">
-        <img data-ref="camimg${i}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='';this.nextElementSibling.lastElementChild.textContent='Touchez pour le direct'" onload="this.style.display='block';this.nextElementSibling.style.display='none'" />
+        <img data-ref="camimg${i}" data-i="${i}" alt="" onload="this.style.display='block';this.nextElementSibling.style.display='none'" />
+        <span class="cam-live" data-ref="camlive${i}"></span>
         <span class="cam-empty" data-ref="camempty${i}">${emIcon('video', 34, 'rgba(255,255,255,0.22)', 1.5)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>
         <span class="cam-tag">${cam.live === false ? 'Dernière image' : '<span class="live"></span>Direct'}</span>
         <span class="cam-time" data-ref="camtime${i}"></span>
@@ -392,6 +393,7 @@ class EcranMuralCard extends HTMLElement {
     this._ro = new ResizeObserver(() => this._fit());
     this._ro.observe(this._viewport);
 
+    [0, 1].forEach((i) => { const im = this.$['camimg' + i]; if (im) im.addEventListener('error', () => this._camFallback(i)); });
     this._buildTicks();
     this._built = true;
     this._tickClock();
@@ -671,10 +673,38 @@ class EcranMuralCard extends HTMLElement {
 
   _refreshCams() { (this._config && this._config.cameras || []).slice(0, 2).forEach((_, i) => this._refreshCam(i)); }
 
+  /* Image fixe indisponible (ex. Netatmo extérieure) : vignette en direct, coupée pendant la veille. */
+  _camFallback(i) {
+    const cam = (this._config.cameras || [])[i];
+    const s = cam && this._st(cam.entity);
+    const img = this.$['camimg' + i], empty = this.$['camempty' + i], live = this.$['camlive' + i];
+    img.style.display = 'none';
+    const canStream = s && (s.attributes.supported_features & 2) && customElements.get('ha-camera-stream');
+    if (!canStream) { empty.style.display = ''; empty.lastElementChild.textContent = 'Touchez pour le direct'; return; }
+    this._liveThumb = this._liveThumb || {};
+    this._liveThumb[i] = true;
+    this._startLiveThumb(i);
+  }
+
+  _startLiveThumb(i) {
+    const cam = (this._config.cameras || [])[i];
+    const s = cam && this._st(cam.entity);
+    const live = this.$['camlive' + i], empty = this.$['camempty' + i];
+    if (!live || !s || this._state.idle || live.firstChild) return;
+    const st = document.createElement('ha-camera-stream');
+    st.hass = this._hass; st.stateObj = s; st.muted = true; st.controls = false; st.className = 'stream';
+    live.appendChild(st);
+    empty.style.display = 'none';
+    this.$['camtime' + i].textContent = '';
+  }
+
+  _stopLiveThumbs() { [0, 1].forEach((i) => { const l = this.$ && this.$['camlive' + i]; if (l) l.innerHTML = ''; }); }
+
   _refreshCam(i) {
     const cam = (this._config.cameras || [])[i];
     const s = cam && this._st(cam.entity);
     const img = this.$ && this.$['camimg' + i];
+    if (this._liveThumb && this._liveThumb[i]) { this._startLiveThumb(i); return; }
     if (!img || !s || !s.attributes.entity_picture || this._state.idle) return;
     const url = s.attributes.entity_picture;
     img.src = `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
@@ -1339,6 +1369,7 @@ class EcranMuralCard extends HTMLElement {
     const glow = this._moment() === 'nuit' ? 'rgba(60,80,200,0.22)' : 'rgba(242,150,60,0.16)';
     this.$.idleGlow.style.background = `radial-gradient(circle, ${glow} 0%, transparent 60%)`;
     this.$.idleOv.hidden = false;
+    this._stopLiveThumbs();
   }
 
   _wake() {
@@ -1506,6 +1537,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .cam{position:relative;height:166px;border-radius:24px;overflow:hidden;padding:0;text-align:left;background:rgba(8,10,14,0.55);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
 .cam img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam-live{position:absolute;inset:0}.cam-live .stream{width:100%;height:100%;display:block;object-fit:cover;--video-max-height:100%}
 .cam-empty{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:#8A8E97}
 .cam-tag{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 .live{width:6px;height:6px;border-radius:50%;background:#FF6B4A;animation:blink 1.6s ease-in-out infinite}
