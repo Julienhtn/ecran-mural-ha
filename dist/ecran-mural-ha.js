@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.27';
+const EM_VERSION = '0.1.28';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1241,18 +1241,44 @@ class EcranMuralCard extends HTMLElement {
     // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
     // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
     const isVdo = /vdo\.ninja/.test(call.room);
-    const vdo = (name) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&videodevice=1&audiodevice=1&label=${encodeURIComponent(name)}`;
-    const direct = (name) => isVdo ? vdo(name) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
+    // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
+    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&audiodevice=1&${phone ? 'facingmode=user' : 'videodevice=1&facingmode=user'}&label=${encodeURIComponent(name)}`;
+    const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
     const relayPath = call.relay_path || '/local/community/ecran-mural-ha/visio.html';
-    const jitsi = (name) => (base && call.relay ? `${base}${relayPath}?room=${encodeURIComponent(call.room)}&name=${encodeURIComponent(name)}` : direct(name));
+    const jitsi = (name, phone) => (base && call.relay ? `${base}${relayPath}?room=${encodeURIComponent(call.room)}&name=${encodeURIComponent(name)}` : direct(name, phone));
     this._callTargets = targets;
-    for (const t of targets) {
-      if (!t.notify) continue;
-      const [d, s] = t.notify.split('.');
-      const link = jitsi(t.name || 'Invité');
-      await this._call(d, s, { title: 'Appel visio', message: 'On vous appelle depuis la maison', data: { url: link, clickAction: link, tag: 'ecran-visio', push: { 'interruption-level': 'time-sensitive' } } });
+    // Sonnerie : la notification est renvoyée toutes les 4 s (son à chaque fois) jusqu'à la réponse, au raccroché ou 45 s.
+    const critical = call.critical !== false;
+    const ring = async (n) => {
+      for (const t of targets) {
+        if (!t.notify) continue;
+        const [d, s] = t.notify.split('.');
+        const link = jitsi(t.name || 'Invité', true);
+        const push = critical ? { sound: { name: 'default', critical: 1, volume: Number(call.volume) || 0.8 }, 'interruption-level': 'critical' } : { sound: 'default', 'interruption-level': 'time-sensitive' };
+        await this._call(d, s, { title: '📹 Appel visio', message: `${call.name || 'La maison'} vous appelle${n > 1 ? ' …' : ''}`, data: { url: link, clickAction: link, tag: 'ecran-visio', push, actions: [{ action: 'URI', title: 'Répondre', uri: link }] } });
+      }
+    };
+    this._ringing = true;
+    clearTimeout(this._ringTimer);
+    let n = 0;
+    const loop = async () => {
+      if (!this._ringing) return;
+      n += 1;
+      await ring(n);
+      if (n * 4 < (Number(call.ring_seconds) || 45)) this._ringTimer = setTimeout(loop, 4000);
+      else this._ringing = false;
+    };
+    await loop();
+    if (!this._onCallMsg) {
+      // VDO.Ninja prévient la page quand quelqu'un rejoint : on arrête de sonner.
+      this._onCallMsg = (ev) => {
+        if (!/vdo\.ninja/.test(ev.origin || '')) return;
+        const txt = typeof ev.data === 'string' ? ev.data : JSON.stringify(ev.data || {});
+        if (/guest-connected|push-connection|new-view-connection|"connected"/i.test(txt)) { this._ringing = false; clearTimeout(this._ringTimer); }
+      };
+      window.addEventListener('message', this._onCallMsg);
     }
     this.$.callPick.hidden = true;
     this.$.callLive.hidden = false;
@@ -1279,6 +1305,8 @@ class EcranMuralCard extends HTMLElement {
   }
 
   async _hangup() {
+    this._ringing = false;
+    clearTimeout(this._ringTimer);
     this.$.callFrame.innerHTML = '';
     this.$.callOv.hidden = true;
     for (const t of this._callTargets || []) {
