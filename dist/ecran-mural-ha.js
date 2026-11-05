@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.3';
+const EM_VERSION = '0.1.4';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -718,11 +718,37 @@ class EcranMuralCard extends HTMLElement {
     for (const e of list) {
       const stat = e.statistic || e.entity;
       const r = { month: null, year: null, monthLY: null, yearLY: null, days: [] };
-      if (stat) {
-        try { r.month = await this._statChange(stat, { calendar: { period: 'month' } }); } catch (x) { /* noop */ }
-        try { r.year = await this._statChange(stat, { calendar: { period: 'year' } }); } catch (x) { /* noop */ }
-        try { r.monthLY = await this._statChange(stat, { fixed: { start_time: monthStartLY.toISOString(), end_time: lastYear.toISOString() } }); } catch (x) { /* noop */ }
-        try { r.yearLY = await this._statChange(stat, { fixed: { start_time: yearStartLY.toISOString(), end_time: lastYear.toISOString() } }); } catch (x) { /* noop */ }
+      if (e.source === 'gazpar') {
+        const a = (this._st(e.entity || 'sensor.gazpar') || {}).attributes || {};
+        const kwh = (x) => (x && x.energy_kwh != null ? Number(x.energy_kwh) : null);
+        const monthly = a.monthly || [], yearly = a.yearly || [], daily = a.daily || [];
+        const pad = (n) => String(n).padStart(2, '0');
+        const mKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+        const mKeyLY = `${now.getFullYear() - 1}-${pad(now.getMonth() + 1)}-01`;
+        r.month = kwh(monthly.find((x) => x.start_date === mKey));
+        r.year = kwh(yearly.find((x) => String(x.time_period) === String(now.getFullYear())));
+        const ly = kwh(monthly.find((x) => x.start_date === mKeyLY));
+        if (ly != null) r.monthLY = ly * now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const yly = kwh(yearly.find((x) => String(x.time_period) === String(now.getFullYear() - 1)));
+        if (yly != null) r.yearLY = yly * ((now - new Date(now.getFullYear(), 0, 1)) / 31536000000);
+        r.days = daily.slice(0, 7).map((x) => kwh(x) || 0).reverse();
+      } else if (stat) {
+        try {
+          const rows = ((await this._hass.callWS({ type: 'recorder/statistics_during_period', start_time: yearStartLY.toISOString(), statistic_ids: [stat], period: 'month', types: ['change'] })) || {})[stat] || [];
+          const t0 = (x) => (typeof x.start === 'number' ? x.start : Date.parse(x.start));
+          const firstInside = rows.length && t0(rows[0]) > yearStartLY.getTime() + 86400000;
+          const clean = rows.map((x, j) => ({ t: t0(x), v: firstInside && j === 0 ? null : Number(x.change || 0) }));
+          const yStart = new Date(now.getFullYear(), 0, 1).getTime();
+          const mStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          const cur = clean.find((x) => x.t === mStart);
+          r.month = cur ? cur.v : 0;
+          const yr = clean.filter((x) => x.t >= yStart && x.v != null);
+          r.year = yr.length ? yr.reduce((acc, x) => acc + x.v, 0) : null;
+          if (!firstInside) {
+            try { r.monthLY = await this._statChange(stat, { fixed: { start_time: monthStartLY.toISOString(), end_time: lastYear.toISOString() } }); } catch (x) { /* noop */ }
+            try { r.yearLY = await this._statChange(stat, { fixed: { start_time: yearStartLY.toISOString(), end_time: lastYear.toISOString() } }); } catch (x) { /* noop */ }
+          }
+        } catch (x) { /* noop */ }
         try {
           const d = await this._hass.callWS({ type: 'recorder/statistics_during_period', start_time: weekAgo.toISOString(), statistic_ids: [stat], period: 'day', types: ['change'] });
           r.days = ((d && d[stat]) || []).map((x) => Number(x.change || 0)).slice(-7);

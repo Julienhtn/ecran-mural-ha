@@ -37,8 +37,8 @@ thermostat: { entity: climate.netatmo, name: Thermostat }
 tempo: { today: sensor.rte_tempo_couleur_actuelle, tomorrow: sensor.rte_tempo_prochaine_couleur }
 energy:
   - { name: Électricité, kind: elec, statistic: sensor.linky_energie, price: 0.1952 }
-  - { name: Gaz, kind: gas, statistic: sensor.gazpar_energie, price: 0.11 }
-  - { name: Eau, kind: water, statistic: sensor.ileo_compteur_eau_index, scale: 0.001, unit: m³, price: 4.2 }   # scale : litres → m³
+  - { name: Gaz, kind: gas, source: gazpar, entity: sensor.gazpar, price: 0.11 }   # lit l'historique GRDF directement
+  - { name: Eau, kind: water, statistic: sensor.ileo_index_mode_ghost, scale: 0.001, unit: m³, price: 4.2 }   # scale : litres → m³
 call:
   room: https://meet.jit.si/ma-salle-secrete
   targets:
