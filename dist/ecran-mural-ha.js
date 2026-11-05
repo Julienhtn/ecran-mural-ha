@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.16';
+const EM_VERSION = '0.1.17';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -539,7 +539,7 @@ class EcranMuralCard extends HTMLElement {
     if (a.state === 'triggered' && this._prevAlarm !== 'triggered') { this._wake(); this._openPad(); }
     if (this._prevAlarm && this._prevAlarm !== a.state && this._state.pad && a.state === 'disarmed' && this._prevAlarm !== 'disarmed') this._closePad();
     this._prevAlarm = a.state;
-    if (this._state.pad) this._renderPad();
+    if (this._state.pad && !this._submitting) this._renderPad();
   }
 
   _openSummary() {
@@ -1075,6 +1075,7 @@ class EcranMuralCard extends HTMLElement {
     else service = 'alarm_disarm';
     try {
       const before = a.state;
+      this._submitting = true;
       await this._hass.callService('alarm_control_panel', service, code ? { entity_id: entity, code } : { entity_id: entity });
       // Alarmo ne renvoie pas d'erreur sur un mauvais code : on vérifie que l'état change vraiment.
       const ok = await new Promise((resolve) => {
@@ -1089,8 +1090,10 @@ class EcranMuralCard extends HTMLElement {
       });
       if (!ok) throw new Error('refused');
       this._chime(service === 'alarm_disarm' ? 'disarm' : 'arm');
-      setTimeout(() => this._closePad(), 250);
+      this._submitting = false;
+      this._closePad();
     } catch (err) {
+      this._submitting = false;
       this._chime('error');
       s.code = '';
       s.padError = code ? 'Code refusé par l’alarme, réessayez' : 'L’alarme ne s’est pas armée : une porte est peut-être ouverte';
