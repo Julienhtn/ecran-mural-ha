@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.2.1';
+const EM_VERSION = '0.3.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -13,6 +13,9 @@ const EM_H = 800;
 const EM_ICONS = {
   shield: '<path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"></path><path d="M9.5 12l1.8 1.8L15 10"></path>',
   away: '<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-5h4v5"></path>',
+  pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"></path>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1"></circle><circle cx="4.5" cy="12" r="1"></circle><circle cx="4.5" cy="18" r="1"></circle>',
+  lamp: '<path d="M9 18h6M10 21h4"></path><path d="M12 3l6 9H6z"></path>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"></path>',
   video: '<rect x="3" y="6" width="12" height="12" rx="2"></rect><path d="M15 10l6-3v10l-6-3"></path>',
   thermo: '<path d="M14 14.76V4a2 2 0 1 0-4 0v10.76a4 4 0 1 0 4 0z"></path>',
@@ -301,7 +304,43 @@ class EcranMuralCard extends HTMLElement {
         <div class="en-list">${energyHTML}</div>
       </section>
     </div>
+
+    <section class="card m-only m-sec" data-tabs="securite">
+      <div class="eb-row"><span class="eb"><span class="eb-ico">${emIcon('shield', 15, 'currentColor', 1.8)}</span>ALARME</span><span class="eb faint" data-ref="secCount"></span></div>
+      <div class="row-between"><div><h2 class="sec-title" data-ref="secTitle">–</h2><p class="small muted" data-ref="secSince"></p></div></div>
+      <div class="sec-modes">
+        <button class="sec-mode press" data-act="secmode" data-m="disarmed" data-ref="smDis"><b>Désarmée</b><span>CODE PIN</span></button>
+        <button class="sec-mode press" data-act="secmode" data-m="armed_night" data-ref="smNight"><b>Nuit</b><span>PÉRIMÈTRE</span></button>
+        <button class="sec-mode press" data-act="secmode" data-m="armed_away" data-ref="smAway"><b>Absent</b><span>TOUT</span></button>
+      </div>
+      <div class="sec-doors" data-ref="secDoors"></div>
+      <div class="row-between eb faint"><span data-ref="secFoot1"></span><span data-ref="secFoot2"></span></div>
+    </section>
+
+    <section class="card m-only m-sys" data-tabs="securite">
+      <div class="eb-row"><span class="eb"><span class="eb-ico">${emIcon('pulse', 15, 'currentColor', 1.8)}</span>ÉTAT DU SYSTÈME</span><span class="eb" data-ref="sysHead"></span></div>
+      <div class="sys-list" data-ref="sysList"></div>
+      <div class="row-between eb faint"><span data-ref="sysTime"></span><span>Home Assistant <span data-ref="sysVer"></span></span></div>
+    </section>
+
+    <section class="card m-only m-cam" data-tabs="cameras">
+      <div class="eb-row"><span class="eb"><span class="eb-ico">${emIcon('video', 15, 'currentColor', 1.8)}</span>CAMÉRAS</span><span class="eb faint" data-ref="camLast"></span></div>
+      <div class="cam-tools" data-ref="camTools"></div>
+    </section>
+
+    <section class="card m-only m-journal" data-tabs="journal securite">
+      <div class="eb-row"><span class="eb"><span class="eb-ico">${emIcon('list', 15, 'currentColor', 1.8)}</span>JOURNAL</span><span class="eb faint" data-ref="jHead"></span></div>
+      <div class="j-list" data-ref="jList"><p class="small faint">Chargement…</p></div>
+      <button class="j-more press" data-act="tab" data-t="journal" data-ref="jMore">Tout le journal</button>
+    </section>
   </div>
+
+  <nav class="tabbar m-only" aria-label="Sections">
+    <button data-act="tab" data-t="maison" data-ref="tb_maison">${emIcon('away', 22, 'currentColor', 1.8)}<span>Maison</span></button>
+    <button data-act="tab" data-t="cameras" data-ref="tb_cameras">${emIcon('video', 22, 'currentColor', 1.8)}<span>Caméras</span></button>
+    <button data-act="tab" data-t="securite" data-ref="tb_securite">${emIcon('shield', 22, 'currentColor', 1.8)}<span>Alarme</span></button>
+    <button data-act="tab" data-t="journal" data-ref="tb_journal">${emIcon('list', 22, 'currentColor', 1.8)}<span>Journal</span></button>
+  </nav>
 
   <div class="halo" data-ref="halo" aria-hidden="true"></div>
 
@@ -394,6 +433,12 @@ class EcranMuralCard extends HTMLElement {
     this._ro.observe(this._viewport);
 
     [0, 1].forEach((i) => { const im = this.$['camimg' + i]; if (im) im.addEventListener('error', () => this._camFallback(i)); });
+    // Onglets du mode téléphone
+    const tabs = { '.clock': 'maison', '.alarm': 'maison', '.scenes': 'maison', '.covers': 'maison', '.thermo': 'maison', '.energy': 'maison', '.weather': 'maison', '.tempo': 'maison', '.cams': 'cameras' };
+    Object.entries(tabs).forEach(([sel, t]) => { const el = this.shadowRoot.querySelector('.grid ' + sel); if (el) el.dataset.tabs = t; });
+    let savedTab = 'maison';
+    try { savedTab = localStorage.getItem('ecran-mural-tab') || 'maison'; } catch (e) { /* noop */ }
+    this._setTab(savedTab, true);
     this._buildTicks();
     this._built = true;
     this._tickClock();
@@ -490,6 +535,7 @@ class EcranMuralCard extends HTMLElement {
     this._updateTempo();
     this._updateScenes();
     this._updateCams();
+    if (this._isMobile && this._isMobile()) { this._updateSecurity(); this._updateCamTools(); this._scheduleSys(); this._journalOnChange(); }
   }
 
   _moment() {
@@ -1028,6 +1074,10 @@ class EcranMuralCard extends HTMLElement {
     const i = el.dataset.i;
     switch (act) {
       case 'pad': this._openPad(); break;
+      case 'tab': this._setTab(el.dataset.t); break;
+      case 'secmode': this._secMode(el.dataset.m); break;
+      case 'camlight': this._call('light', 'toggle', { entity_id: el.dataset.e }); break;
+      case 'camfull': this._openCam(Number(el.dataset.i), false); break;
       case 'closepad': this._closePad(); break;
       case 'mode':
         this._state.padMode = el.dataset.m;
@@ -1402,6 +1452,170 @@ class EcranMuralCard extends HTMLElement {
     this._refreshCams();
   }
 
+
+  /* ================= Mode téléphone : onglets, sécurité, état, journal ================= */
+  _setTab(t, silent) {
+    const ok = ['maison', 'cameras', 'securite', 'journal'];
+    if (!ok.includes(t)) t = 'maison';
+    this._state.tab = t;
+    if (this.$.viewport) this.$.viewport.dataset.tab = t;
+    ok.forEach((k) => { const b = this.$['tb_' + k]; if (b) b.classList.toggle('on', k === t); });
+    if (this.$.jMore) this.$.jMore.style.display = t === 'journal' ? 'none' : '';
+    try { localStorage.setItem('ecran-mural-tab', t); } catch (e) { /* noop */ }
+    if (!silent) { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* noop */ } }
+    if (this._hass && (t === 'journal' || t === 'securite')) this._loadJournal();
+    if (this._hass && t === 'securite') this._updateSystem();
+  }
+
+  _hm(d) { const x = new Date(d); return `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`; }
+
+  _updateSecurity() {
+    if (!this.$.secTitle) return;
+    const a = this._alarmInfo();
+    const st = this._st(this._config.alarm);
+    this.$.secTitle.textContent = a.state === 'disarmed' ? 'Désarmée' : a.label;
+    this.$.secTitle.style.color = a.state === 'disarmed' ? '#3DD68C' : a.title;
+    this.$.secSince.textContent = st && st.last_changed ? `Depuis ${this._hm(st.last_changed)} · ${a.state === 'disarmed' ? 'système prêt' : a.sub.toLowerCase()}` : '';
+    const map = { disarmed: 'smDis', armed_night: 'smNight', armed_away: 'smAway' };
+    Object.entries(map).forEach(([m, ref]) => this.$[ref].classList.toggle('on', a.state === m || (m === 'armed_away' && a.state === 'armed_vacation')));
+    const doors = this._config.doors || [];
+    let open = 0, ko = 0;
+    this.$.secDoors.innerHTML = doors.map((d) => {
+      const s = this._st(d.entity);
+      const bad = !s || s.state === 'unavailable' || s.state === 'unknown';
+      const isOpen = s && s.state === 'on';
+      if (isOpen) open++;
+      if (bad) ko++;
+      const kind = d.kind || (/fen[eê]tre|baie|velux/i.test(d.name + ' ' + (s ? s.attributes.friendly_name : '')) ? 'FENÊTRE' : 'PORTE');
+      const cls = bad ? 'door-ko' : isOpen ? 'door-open' : '';
+      const lab = bad ? 'INJOIGNABLE' : isOpen ? 'OUVERTE' : 'OK';
+      return `<div class="door ${cls}"><span class="dot"></span><span class="door-txt"><span class="eb faint">${kind}</span><b>${emEsc(d.name)}</b></span><span class="eb">${lab}</span></div>`;
+    }).join('');
+    this.$.secCount.textContent = open ? `${open} OUVERTURE${open > 1 ? 'S' : ''}` : 'TOUT EST FERMÉ';
+    this.$.secFoot1.textContent = ko ? `${ko} capteur${ko > 1 ? 's' : ''} injoignable${ko > 1 ? 's' : ''}` : 'Capteurs · OK';
+    this.$.secFoot2.textContent = `Vérifié ${this._hm(Date.now())}`;
+  }
+
+  _secMode(m) {
+    const a = this._alarmInfo();
+    if (m === 'disarmed') { if (a.state !== 'disarmed') this._openPad(); return; }
+    if (a.state === m) return;
+    if (a.state !== 'disarmed') { this._toast('Désarmez d’abord pour changer de mode'); return; }
+    this._state.padMode = m;
+    if (!this._armNeedsCode()) { this._state.code = ''; this._submitCode(); } else this._openPad();
+  }
+
+  _updateCamTools() {
+    if (!this.$.camTools) return;
+    const cams = (this._config.cameras || []).slice(0, 2);
+    const html = cams.map((c, i) => {
+      const s = this._st(c.entity);
+      const ok = s && s.state !== 'unavailable';
+      const l = c.light ? this._st(c.light) : null;
+      const lightBtn = l ? `<button class="tool press ${l.state === 'on' ? 'on' : ''}" data-act="camlight" data-e="${emEsc(c.light)}">${emIcon('lamp', 18, 'currentColor', 1.8)}<span>${l.state === 'on' ? 'Éteindre' : 'Allumer'} le projecteur</span></button>` : '';
+      return `<div class="tool-row"><span class="dot" style="background:${ok ? '#3DD68C' : '#6B6F78'}"></span><b>${emEsc(c.name)}</b><span class="eb faint">${ok ? (s.state === 'streaming' ? 'DIRECT' : 'IMAGE FIXE') : 'INJOIGNABLE'}</span></div>
+        <div class="tools">${lightBtn}<button class="tool press" data-act="camfull" data-i="${i}">${emIcon('video', 18, 'currentColor', 1.8)}<span>Plein écran</span></button></div>`;
+    }).join('');
+    if (html !== this._camToolsHtml) { this._camToolsHtml = html; this.$.camTools.innerHTML = html; }
+    const last = (this._journal || []).find((j) => j.kind === 'cam');
+    this.$.camLast.textContent = last ? `DERNIER · ${this._hm(last.t)}` : '';
+  }
+
+  _scheduleSys() {
+    if (this._state.tab !== 'securite') return;
+    if (this._sysAt && Date.now() - this._sysAt < 30000) return;
+    this._updateSystem();
+  }
+
+  async _updateSystem() {
+    if (!this.$.sysList || !this._hass) return;
+    this._sysAt = Date.now();
+    const H = this._hass, c = this._config, rows = [];
+    const add = (name, value, level) => rows.push({ name, value, level });
+    add('Home Assistant', H.connected === false ? 'Déconnecté' : 'Opérationnel', H.connected === false ? 'ko' : 'ok');
+    try {
+      const cs = await H.callWS({ type: 'cloud/status' });
+      if (cs && cs.logged_in) add('Accès à distance', cs.remote_connected ? 'Nabu Casa · connecté' : 'Nabu Casa · hors ligne', cs.remote_connected ? 'ok' : 'warn');
+    } catch (e) { /* noop */ }
+    const al = this._st(c.alarm);
+    add('Alarmo', !al || al.state === 'unavailable' ? 'Indisponible' : 'Opérationnel', !al || al.state === 'unavailable' ? 'ko' : 'ok');
+    const doors = c.doors || [];
+    const dOk = doors.filter((d) => { const s = this._st(d.entity); return s && !['unavailable', 'unknown'].includes(s.state); }).length;
+    if (doors.length) add('Ouvertures', `${dOk} / ${doors.length} joignables`, dOk === doors.length ? 'ok' : 'warn');
+    const cams = (c.cameras || []);
+    const cOk = cams.filter((x) => { const s = this._st(x.entity); return s && s.state !== 'unavailable'; }).length;
+    if (cams.length) add('Caméras', `${cOk} / ${cams.length} joignables`, cOk === cams.length ? 'ok' : 'warn');
+    if (c.thermostat) { const t = this._st(c.thermostat.entity); add('Thermostat', t && t.state !== 'unavailable' ? 'Opérationnel' : 'Indisponible', t && t.state !== 'unavailable' ? 'ok' : 'ko'); }
+    const en = (c.energy || []);
+    if (en.length) { const n = (this._energy || []).filter((r) => r && r.month != null).length; add('Compteurs', `${n} / ${en.length} à jour`, n === en.length ? 'ok' : 'warn'); }
+    if (c.tempo && c.tempo.today) { const t = this._st(c.tempo.today); add('EDF Tempo', t && !['unavailable', 'unknown'].includes(t.state) ? `Aujourd’hui ${t.state}` : 'Indisponible', t && !['unavailable', 'unknown'].includes(t.state) ? 'ok' : 'warn'); }
+    const batt = Object.entries(H.states).filter(([id, x]) => x.attributes && x.attributes.device_class === 'battery' && id.startsWith('sensor.')).map(([, x]) => x);
+    const vals = batt.filter((x) => !isNaN(parseFloat(x.state)));
+    if (batt.length) {
+      const low = vals.filter((x) => parseFloat(x.state) <= 20);
+      const off = batt.length - vals.length;
+      const min = vals.sort((a, b) => parseFloat(a.state) - parseFloat(b.state))[0];
+      add('Piles', low.length ? `${low.length} faible${low.length > 1 ? 's' : ''} · ${(min.attributes.friendly_name || '').replace(/ ?batterie/i, '')} ${Math.round(parseFloat(min.state))} %` : off ? `${vals.length} OK · ${off} injoignable${off > 1 ? 's' : ''}` : `${vals.length} OK · min ${Math.round(parseFloat(min.state))} %`, low.length ? 'ko' : off ? 'warn' : 'ok');
+    }
+    const bk = H.states['event.backup_automatic_backup'];
+    if (bk) add('Sauvegarde', bk.attributes.event_type === 'completed' ? `OK · ${new Date(bk.state).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : (bk.attributes.event_type === 'failed' ? 'Échec' : 'En cours'), bk.attributes.event_type === 'failed' ? 'ko' : 'ok');
+    const col = { ok: '#3DD68C', warn: '#F2B544', ko: '#FF6B4A' };
+    this.$.sysList.innerHTML = rows.map((r) => `<div class="sys-row"><span class="dot" style="background:${col[r.level]};box-shadow:0 0 8px ${col[r.level]}"></span><span>${emEsc(r.name)}</span><span class="eb ${r.level === 'ok' ? 'faint' : ''}" style="${r.level === 'ok' ? '' : 'color:' + col[r.level]}">${emEsc(r.value)}</span></div>`).join('');
+    const bad = rows.filter((r) => r.level !== 'ok').length;
+    this.$.sysHead.textContent = bad ? `${bad} POINT${bad > 1 ? 'S' : ''} À VÉRIFIER` : 'TOUT RÉPOND';
+    this.$.sysHead.style.color = bad ? '#F2B544' : '#3DD68C';
+    this.$.sysTime.textContent = `Mise à jour · ${this._hm(Date.now())}`;
+    this.$.sysVer.textContent = (H.config && H.config.version) || '';
+  }
+
+  _journalOnChange() {
+    // Recharge le journal (au plus toutes les 20 s) quand l'alarme ou une ouverture change.
+    const keys = [this._config.alarm].concat((this._config.doors || []).map((d) => d.entity));
+    const sig = keys.map((k) => { const s = this._st(k); return s ? s.last_changed : ''; }).join('|');
+    if (sig === this._jSig) return;
+    const first = !this._jSig;
+    this._jSig = sig;
+    if (first) return;
+    if (['journal', 'securite'].includes(this._state.tab)) { clearTimeout(this._jTimer); this._jTimer = setTimeout(() => this._loadJournal(), 1500); }
+  }
+
+  async _loadJournal() {
+    if (!this._hass || !this.$.jList) return;
+    const c = this._config;
+    const doors = c.doors || [];
+    const doorName = {};
+    doors.forEach((d) => { doorName[d.entity] = d.name; });
+    const ids = [c.alarm].concat(doors.map((d) => d.entity)).filter(Boolean);
+    const start = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+    let evs = [];
+    try { evs = await this._hass.callWS({ type: 'logbook/get_events', start_time: start, end_time: new Date().toISOString() }); } catch (e) { evs = []; }
+    const alarmTxt = { disarmed: ['Alarme désarmée', 'ok'], armed_away: ['Alarme armée · Absent', 'arm'], armed_night: ['Alarme armée · Nuit', 'night'], armed_home: ['Alarme armée · Présence', 'night'], armed_vacation: ['Alarme armée · Vacances', 'arm'], arming: ['Armement en cours', 'warn'], pending: ['Ouverture détectée · délai d’entrée', 'warn'], triggered: ['ALARME DÉCLENCHÉE', 'alert'] };
+    const out = [];
+    (evs || []).forEach((e) => {
+      const t = (e.when || 0) * 1000;
+      if (e.entity_id === c.alarm && alarmTxt[e.state]) out.push({ t, txt: alarmTxt[e.state][0], kind: alarmTxt[e.state][1] });
+      else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) out.push({ t, txt: `${doorName[e.entity_id]} ${e.state === 'on' ? 'ouverte' : 'fermée'}`, kind: e.state === 'on' ? 'door' : 'door-off' });
+      else if (e.domain === 'ecran_mural' || (e.name === 'Caméra' && e.message)) out.push({ t, txt: e.message.charAt(0).toUpperCase() + e.message.slice(1), kind: 'cam' });
+    });
+    out.sort((a, b) => b.t - a.t);
+    // Les fermetures de portes n'apparaissent que sur le journal complet.
+    this._journal = out;
+    const full = this._state.tab === 'journal';
+    const list = (full ? out : out.filter((x) => x.kind !== 'door-off')).slice(0, full ? 60 : 6);
+    const col = { ok: '#3DD68C', arm: '#FF6B4A', night: '#8B9CFF', warn: '#F2B544', alert: '#E5484D', door: '#F2B544', 'door-off': '#6B6F78', cam: '#7FB0FF' };
+    let lastDay = '';
+    const today = new Date().toDateString();
+    this.$.jList.innerHTML = list.length ? list.map((x) => {
+      const d = new Date(x.t);
+      const day = d.toDateString();
+      let head = '';
+      if (full && day !== lastDay) { lastDay = day; head = `<div class="j-day eb faint">${day === today ? 'AUJOURD’HUI' : d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}</div>`; }
+      return `${head}<div class="j-row"><span class="j-time">${this._hm(x.t)}</span><span class="j-dot" style="background:${col[x.kind] || '#A3A6AD'}"></span><span class="j-txt">${emEsc(x.txt)}</span></div>`;
+    }).join('') : '<p class="small faint">Rien à signaler sur les dernières 48 h.</p>';
+    this.$.jHead.textContent = out[0] ? `DERNIER · ${this._hm(out[0].t)}` : '';
+    this._updateCamTools();
+  }
+
   /* Bips d'ambiance : délai d'entrée = 2 bips/s (plus rapides sur la fin), armement = 1 bip doux toutes les 2 s, alarme = sirène. */
   _beepFor(state) {
     if (this._beepState === state) return;
@@ -1735,6 +1949,70 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .mobile .call-target{padding:16px;flex-direction:row;align-items:center;gap:16px;justify-content:flex-start}
 .mobile .avatar{width:52px;height:52px;font-size:20px}
 .mobile .toast{position:fixed}
+
+/* ---------- Téléphone : onglets et cartes « Vigie » ---------- */
+.m-only{display:none!important}
+.mobile .m-only{display:flex!important}
+.mobile[data-tab="maison"] .grid > [data-tabs]:not([data-tabs~="maison"]),
+.mobile[data-tab="maison"] .grid .col > [data-tabs]:not([data-tabs~="maison"]),
+.mobile[data-tab="cameras"] .grid > [data-tabs]:not([data-tabs~="cameras"]),
+.mobile[data-tab="cameras"] .grid .col > [data-tabs]:not([data-tabs~="cameras"]),
+.mobile[data-tab="securite"] .grid > [data-tabs]:not([data-tabs~="securite"]),
+.mobile[data-tab="securite"] .grid .col > [data-tabs]:not([data-tabs~="securite"]),
+.mobile[data-tab="journal"] .grid > [data-tabs]:not([data-tabs~="journal"]),
+.mobile[data-tab="journal"] .grid .col > [data-tabs]:not([data-tabs~="journal"]){display:none!important}
+.mobile .grid{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.mobile[data-tab="cameras"] .cams{order:1}
+.mobile .m-cam{order:2}
+.mobile .m-sec{order:1}
+.mobile .m-sys{order:3}
+.mobile .m-journal{order:2}
+.eb{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#C9CBD0;white-space:nowrap}
+.eb.faint{color:#8A8E97}
+.eb-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.eb-row > .eb:first-child{display:inline-flex;align-items:center;gap:10px}
+.eb-ico{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:rgba(242,181,68,0.12);color:var(--accent)}
+.sec-title{font-size:30px;font-weight:500;letter-spacing:-0.03em;white-space:normal}
+.sec-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sec-mode{border-radius:16px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.05);padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.sec-mode b{font-size:16px;font-weight:600}
+.sec-mode span{font-family:"Geist Mono",ui-monospace,monospace;font-size:9.5px;letter-spacing:.08em;color:#8A8E97}
+.sec-mode.on{background:#F2F1EE;color:#0B0C0E;border-color:#F2F1EE}
+.sec-mode.on span{color:#55585F}
+.sec-doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.door{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,0.045);border:1px solid rgba(255,255,255,0.08)}
+.door .dot{background:#3DD68C;box-shadow:0 0 8px #3DD68C;flex:none}
+.door-txt{display:flex;flex-direction:column;flex:1;min-width:0}
+.door-txt b{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.door > .eb{color:#3DD68C}
+.door-open{background:rgba(255,107,74,0.12);border-color:rgba(255,107,74,0.45)}
+.door-open .dot{background:#FF6B4A;box-shadow:0 0 8px #FF6B4A}
+.door-open > .eb{color:#FF8A6E}
+.door-ko .dot{background:#6B6F78;box-shadow:none}
+.door-ko > .eb{color:#8A8E97}
+.sys-list{display:flex;flex-direction:column}
+.sys-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed rgba(255,255,255,0.08);font-size:14px}
+.sys-row:last-child{border-bottom:0}
+.sys-row > span:nth-child(2){flex:1}
+.sys-row .dot{flex:none}
+.j-list{display:flex;flex-direction:column;gap:2px}
+.j-row{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:14px}
+.j-time{font-family:"Geist Mono",ui-monospace,monospace;font-size:12px;color:#8A8E97;width:40px;flex:none}
+.j-dot{width:8px;height:8px;border-radius:2px;flex:none}
+.j-txt{flex:1;min-width:0}
+.j-day{padding:12px 0 4px}
+.j-more{height:46px;border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.05);font-size:15px;font-weight:500}
+.cam-tools{display:flex;flex-direction:column;gap:10px}
+.tool-row{display:flex;align-items:center;gap:10px;font-size:15px}
+.tool-row b{flex:1;font-weight:500}
+.tool-row .dot{flex:none}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+.tool{height:46px;border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:500}
+.tool.on{background:rgba(242,181,68,0.14);border-color:rgba(242,181,68,0.5);color:#FFD27A}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:15;justify-content:center;gap:4px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:rgba(12,13,16,0.72);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border-top:1px solid rgba(255,255,255,0.08)}
+.tabbar button{flex:1;max-width:130px;border:0;background:transparent;color:#8A8E97;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:14px;font-size:11px;font-weight:500;transition:color .25s ease,background .25s ease}
+.tabbar button.on{color:#F2F1EE;background:rgba(255,255,255,0.07)}
+.tabbar button.on svg{color:var(--accent)}
 
 @keyframes ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.32);opacity:0}}
 @keyframes breathe{0%,100%{opacity:.65}50%{opacity:1}}
