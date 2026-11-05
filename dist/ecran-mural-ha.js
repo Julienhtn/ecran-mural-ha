@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.20';
+const EM_VERSION = '0.1.22';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -696,15 +696,9 @@ class EcranMuralCard extends HTMLElement {
 
   /* Fenêtre fixe 6h → minuit : aujourd'hui (demain à partir de 21h). Heures passées = historique, à venir = prévisions. */
   _weatherDay() {
-    // Aujourd'hui si la journée 6h→24h peut être tracée en entier (historique depuis 6h + prévisions), sinon demain.
+    // Axe fixe : aujourd'hui, de 6h à minuit.
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    if (now.getHours() >= 21) return tomorrow;
-    if (now.getHours() < 6) return today;
-    const six = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6).getTime();
-    const hasMorning = this._wHist && this._wHist[six] != null;
-    return hasMorning ? today : tomorrow;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }
 
   async _loadWeatherHistory() {
@@ -740,7 +734,7 @@ class EcranMuralCard extends HTMLElement {
     const day = this._weatherDay();
     const now = Date.now();
     const isToday = day.getDate() === new Date().getDate();
-    this.$.wTitle.textContent = `${isToday ? 'Aujourd’hui' : 'Demain'} · 6h – 24h`;
+    this.$.wTitle.textContent = 'Aujourd’hui';
     const fcMap = {};
     (this._forecast || []).forEach((f) => { const t = new Date(f.datetime); t.setMinutes(0, 0, 0); fcMap[t.getTime()] = f; });
     const hist = this._wHist || {};
@@ -769,24 +763,29 @@ class EcranMuralCard extends HTMLElement {
       this.$.rainTotal.textContent = '';
       return;
     }
-    const temps = known.map((x) => x.temp);
+    const curSt = this._st(this._config.weather);
+    const curT = curSt && curSt.attributes.temperature != null ? Number(curSt.attributes.temperature) : null;
+    const temps = known.map((x) => x.temp).concat(isToday && curT != null ? [curT] : []);
     const tmin = Math.min(...temps), tmax = Math.max(...temps);
     const span = Math.max(1, tmax - tmin);
     const x0 = 10, x1 = 238, yT = 22, yB = 86, n = slots.length - 1;
     const X = (i) => x0 + i * (x1 - x0) / n;
     const Y = (v) => yT + (tmax - v) / span * (yB - yT);
-    const pt = (i) => `${X(i).toFixed(1)},${Y(slots[i].temp).toFixed(1)}`;
     const idx = slots.map((x, i) => (x.temp != null ? i : -1)).filter((i) => i >= 0);
-    const pastIdx = idx.filter((i) => slots[i].past);
-    const futIdx = idx.filter((i) => !slots[i].past);
-    if (pastIdx.length && futIdx.length) futIdx.unshift(pastIdx[pastIdx.length - 1]);
-    const line = (arr) => arr.map(pt).join(' ');
     const iMax = idx.find((i) => slots[i].temp === tmax), iMin = idx.find((i) => slots[i].temp === tmin);
     const nowX = isToday && now > slots[0].t && now < slots[n].t ? x0 + ((now - slots[0].t) / (slots[n].t - slots[0].t)) * (x1 - x0) : null;
-    svg.innerHTML = `${futIdx.length > 1 ? `<polygon points="${line(futIdx)} ${X(futIdx[futIdx.length - 1]).toFixed(1)},96 ${X(futIdx[0]).toFixed(1)},96" fill="rgba(242,181,68,0.08)"></polygon>` : ''}
-      ${pastIdx.length > 1 ? `<polyline points="${line(pastIdx)}" fill="none" stroke="rgba(242,181,68,0.45)" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
-      ${futIdx.length > 1 ? `<polyline points="${line(futIdx)}" fill="none" stroke="#F2B544" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
-      ${nowX != null ? `<line x1="${nowX.toFixed(1)}" x2="${nowX.toFixed(1)}" y1="14" y2="96" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="2 3"></line>` : ''}
+    const nowTemp = nowX != null ? curT : null;
+    const P = (i) => [X(i), Y(slots[i].temp)];
+    const nowPt = nowX != null && nowTemp != null ? [nowX, Y(nowTemp)] : null;
+    let pastPts = idx.filter((i) => slots[i].t <= now).map(P);
+    let futPts = idx.filter((i) => slots[i].t > now).map(P);
+    if (nowPt) { pastPts = pastPts.concat([nowPt]); futPts = [nowPt].concat(futPts); } else if (pastPts.length && futPts.length) futPts.unshift(pastPts[pastPts.length - 1]);
+    const line = (arr) => arr.map((q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
+    svg.innerHTML = `${futPts.length > 1 ? `<polygon points="${line(futPts)} ${futPts[futPts.length - 1][0].toFixed(1)},96 ${futPts[0][0].toFixed(1)},96" fill="rgba(242,181,68,0.08)"></polygon>` : ''}
+      ${pastPts.length > 1 ? `<polyline points="${line(pastPts)}" fill="none" stroke="rgba(242,181,68,0.45)" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+      ${futPts.length > 1 ? `<polyline points="${line(futPts)}" fill="none" stroke="#F2B544" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+      ${nowX != null ? `<line x1="${nowX.toFixed(1)}" x2="${nowX.toFixed(1)}" y1="14" y2="96" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="2 3"></line>` : ''}
+      ${nowPt ? `<circle cx="${nowPt[0].toFixed(1)}" cy="${nowPt[1].toFixed(1)}" r="8" fill="rgba(255,255,255,0.18)"></circle><circle cx="${nowPt[0].toFixed(1)}" cy="${nowPt[1].toFixed(1)}" r="4.5" fill="#F2F1EE"></circle>` : ''}
       <circle cx="${X(iMax).toFixed(1)}" cy="${Y(tmax).toFixed(1)}" r="4.5" fill="#F2B544"></circle>
       <text x="${X(iMax).toFixed(1)}" y="${(Y(tmax) - 9).toFixed(1)}" fill="#F2B544" class="svgt" text-anchor="middle">${emFr(tmax, 0)}°</text>
       <circle cx="${X(iMin).toFixed(1)}" cy="${Y(tmin).toFixed(1)}" r="4.5" fill="#7FB0FF"></circle>
