@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.7';
+const EM_VERSION = '0.1.8';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -755,7 +755,7 @@ class EcranMuralCard extends HTMLElement {
         } catch (x) { /* noop */ }
       }
       if (e.tempo && stat && e.source !== 'gazpar') {
-        try { Object.assign(r, await this._tempoCost(stat, e.tempo, Number(e.price) || 0)); } catch (x) { /* noop */ }
+        try { Object.assign(r, await this._tempoCost(stat, e.tempo, Number(e.price) || 0, Number(e.scale) || 1)); } catch (x) { /* noop */ }
       }
       const k = Number(e.scale) || 1;
       if (k !== 1) { ['month', 'year', 'monthLY', 'yearLY'].forEach((key) => { if (r[key] != null) r[key] *= k; }); r.days = r.days.map((x) => x * k); }
@@ -766,7 +766,7 @@ class EcranMuralCard extends HTMLElement {
   }
 
   /* Coût Tempo exact : chaque heure consommée × prix de la couleur du jour (6h→6h) et de la plage HP/HC. */
-  async _tempoCost(stat, t, fallback) {
+  async _tempoCost(stat, t, fallback, scale) {
     const now = new Date();
     const yStart = new Date(now.getFullYear(), 0, 1);
     const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -784,10 +784,23 @@ class EcranMuralCard extends HTMLElement {
     const hcStart = t.hc_start != null ? t.hc_start : 22, hcEnd = t.hc_end != null ? t.hc_end : 6;
     const pad = (n) => String(n).padStart(2, '0');
     let costYear = 0, costMonth = 0;
+    const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const perDay = {};
+    rows.forEach((x) => { if (Number(x.change || 0)) { const k = dayKey(new Date(typeof x.start === 'number' ? x.start : Date.parse(x.start))); perDay[k] = (perDay[k] || 0) + 1; } });
+    const hcShare = t.hc_share != null ? Number(t.hc_share) : 0.42;
     rows.forEach((x) => {
-      const kwh = Number(x.change || 0);
+      const kwh = Number(x.change || 0) * scale;
       if (!kwh) return;
       const d = new Date(typeof x.start === 'number' ? x.start : Date.parse(x.start));
+      if (perDay[dayKey(d)] <= 2) {
+        // Donnée journalière (pas de détail horaire) : prix moyen HC/HP de la couleur du jour.
+        const col = colors[dayKey(d)] || 'bleu';
+        const pz = (t.prices && t.prices[col]) || [fallback, fallback];
+        const c = kwh * (hcShare * Number(pz[0]) + (1 - hcShare) * Number(pz[1]));
+        costYear += c;
+        if (d >= mStart) costMonth += c;
+        return;
+      }
       const h = d.getHours();
       const tempoDay = new Date(d.getTime() - (h < 6 ? 86400000 : 0));
       const key = `${tempoDay.getFullYear()}-${pad(tempoDay.getMonth() + 1)}-${pad(tempoDay.getDate())}`;
