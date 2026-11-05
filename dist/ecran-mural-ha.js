@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.15';
+const EM_VERSION = '0.1.16';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -36,6 +36,27 @@ function emIcon(name, size, stroke, sw) {
 
 function emEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function emWeatherIcon(cond, h) {
+  const night = h < 7 || h >= 19;
+  const sun = '<circle cx="12" cy="12" r="4" stroke="#F2B544"></circle><path stroke="#F2B544" d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"></path>';
+  const moon = '<path stroke="#A9B5FF" d="M19 14.5A7.5 7.5 0 0 1 9.5 5 7.5 7.5 0 1 0 19 14.5z"></path>';
+  const cloud = (col) => `<path stroke="${col}" d="M7 18h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7 9.5 4.25 4.25 0 0 0 7 18z"></path>`;
+  const small = (n) => (night ? '<path stroke="#A9B5FF" d="M11 6.5A3.5 3.5 0 0 1 6.5 2 3.5 3.5 0 1 0 11 6.5z"></path>' : '<circle cx="7" cy="7" r="2.6" stroke="#F2B544"></circle><path stroke="#F2B544" d="M7 1.8v1M1.8 7h1M3.3 3.3l.7.7M10.7 3.3l-.7.7"></path>');
+  let body;
+  switch (cond) {
+    case 'sunny': body = night ? moon : sun; break;
+    case 'clear-night': body = moon; break;
+    case 'partlycloudy': body = small() + '<g transform="translate(3 3) scale(.85)">' + cloud('#C9CBD0') + '</g>'; break;
+    case 'cloudy': case 'fog': body = cloud('#C9CBD0') + (cond === 'fog' ? '<path stroke="#8A8E97" d="M5 21h14"></path>' : ''); break;
+    case 'rainy': case 'pouring': body = '<g transform="translate(0 -3)">' + cloud('#C9CBD0') + '</g><path stroke="#7FB0FF" d="M9 18.5l-1 2.5M13 18.5l-1 2.5' + (cond === 'pouring' ? 'M17 18.5l-1 2.5' : '') + '"></path>'; break;
+    case 'snowy': case 'snowy-rainy': body = '<g transform="translate(0 -3)">' + cloud('#C9CBD0') + '</g><path stroke="#E8F0FF" d="M9 19.5h.01M13 21h.01M16 19.5h.01"></path>'; break;
+    case 'lightning': case 'lightning-rainy': body = '<g transform="translate(0 -3)">' + cloud('#C9CBD0') + '</g><path stroke="#F2B544" d="M12.5 15.5l-2 3.5h3l-2 3.5"></path>'; break;
+    case 'windy': case 'windy-variant': body = '<path stroke="#C9CBD0" d="M3 9h11a2.5 2.5 0 1 0-2.5-2.5M3 13h15a2.5 2.5 0 1 1-2.5 2.5M3 17h8"></path>'; break;
+    default: body = cloud('#8A8E97');
+  }
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 }
 
 function emFr(n, d) {
@@ -201,6 +222,7 @@ class EcranMuralCard extends HTMLElement {
 
       <section class="card weather">
         <div class="row-between"><h2 data-ref="wTitle">Aujourd’hui</h2><p class="small"><span class="warm" data-ref="wmax"></span>  <span class="cool" data-ref="wmin"></span></p></div>
+        <div class="wicons" data-ref="wicons" aria-hidden="true"></div>
         <svg viewBox="0 0 248 108" width="100%" height="108" data-ref="wchart" role="img" aria-label="Température heure par heure"></svg>
         <div class="row-between"><h3>Précipitations</h3><p class="small cool" data-ref="rainTotal"></p></div>
         <div class="rain" data-ref="rain" role="img" aria-label="Précipitations heure par heure"></div>
@@ -689,16 +711,20 @@ class EcranMuralCard extends HTMLElement {
     try {
       const r = await this._hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: now.toISOString(), entity_ids: [c.weather], minimal_response: false, no_attributes: false, significant_changes_only: false });
       const list = (r && r[c.weather]) || [];
-      const pts = list.map((x) => ({ t: (x.lu || x.lc || 0) * 1000, v: x.a && x.a.temperature != null ? Number(x.a.temperature) : null })).filter((x) => x.v != null);
+      const pts = list.map((x) => ({ t: (x.lu || x.lc || 0) * 1000, v: x.a && x.a.temperature != null ? Number(x.a.temperature) : null, c: x.s })).filter((x) => x.v != null);
       const out = {};
+      const cond = {};
       for (let h = 6; h <= 24; h++) {
         const t = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h).getTime();
         if (t > now.getTime()) break;
         let v = null;
-        pts.forEach((p) => { if (p.t <= t) v = p.v; });
+        let cc = null;
+        pts.forEach((p) => { if (p.t <= t) { v = p.v; cc = p.c; } });
         if (v != null) out[t] = v;
+        if (cc) cond[t] = cc;
       }
       this._wHist = out;
+      this._wHistCond = cond;
     } catch (e) { this._wHist = this._wHist || {}; }
     this._renderWeather();
   }
@@ -722,11 +748,14 @@ class EcranMuralCard extends HTMLElement {
         const cur = this._st(this._config.weather);
         if (cur && t > now - 3600000) temp = Number(cur.attributes.temperature);
       }
-      slots.push({ h, t, temp, rain: f ? Number(f.precipitation || 0) : null, past: past && !f });
+      let cond = f ? f.condition : (this._wHistCond || {})[t];
+      if (!cond && t <= now + 3600000 && t > now - 3600000) { const cur = this._st(this._config.weather); if (cur) cond = cur.state; }
+      slots.push({ h, t, temp, cond, rain: f ? Number(f.precipitation || 0) : null, past: past && !f });
     }
     const known = slots.filter((x) => x.temp != null);
     if (known.length < 2) {
       svg.innerHTML = '<text x="124" y="58" class="svgt" text-anchor="middle">Prévisions indisponibles</text>';
+      this.$.wicons.innerHTML = '';
       this.$.rain.innerHTML = '';
       this.$.axis.innerHTML = '';
       this.$.wmax.textContent = '';
@@ -769,6 +798,7 @@ class EcranMuralCard extends HTMLElement {
     const tot = bars.reduce((a, x) => a + (x.rain || 0), 0);
     this.$.rainTotal.textContent = `${emFr(tot, 1)} mm`;
     this.$.axis.innerHTML = ['6h', '12h', '18h', '24h'].map((l) => `<span>${l}</span>`).join('');
+    this.$.wicons.innerHTML = slots.map((x, i) => (x.h % 2 === 0 && x.h < 24 && x.cond ? `<span style="left:${(X(i) / 248 * 100).toFixed(2)}%;opacity:${x.past ? 0.45 : 1}" title="${x.h}h">${emWeatherIcon(x.cond, x.h)}</span>` : '')).join('');
   }
 
   async _statChange(id, period) {
@@ -1336,6 +1366,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 
 .weather{flex:1}
 .svgt{fill:#8A8E97;font-size:10px;font-family:"Geist Mono",ui-monospace,monospace}
+.wicons{position:relative;height:20px;margin:2px 0 -4px}.wicons span{position:absolute;top:0;transform:translateX(-50%);display:flex}
 .rain{display:flex;align-items:flex-end;gap:3px;height:56px}
 .rain span{flex:1;border-radius:3px}
 .axis{display:flex;justify-content:space-between;font-family:"Geist Mono",ui-monospace,monospace;font-size:10px;color:#8A8E97}
