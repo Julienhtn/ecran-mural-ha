@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.4';
+const EM_VERSION = '0.1.5';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -560,6 +560,7 @@ class EcranMuralCard extends HTMLElement {
       return;
     }
     const cur = parseFloat(s.attributes.current_temperature);
+    if (this._pendingSetpoint != null && this._pendingSince && (Math.abs(parseFloat(s.attributes.temperature) - this._pendingSetpoint) < 0.05 || Date.now() - this._pendingSince > 180000)) { this._pendingSetpoint = null; this._pendingSince = null; }
     const sp = this._pendingSetpoint != null ? this._pendingSetpoint : parseFloat(s.attributes.temperature);
     const heating = s.attributes.hvac_action === 'heating' || (!isNaN(sp) && !isNaN(cur) && sp > cur + 0.2 && s.state !== 'off');
     this._setOdo.set(isNaN(sp) ? '–' : `${emFr(sp, 1)}°`);
@@ -895,13 +896,26 @@ class EcranMuralCard extends HTMLElement {
     if (a.state === 'disarmed') service = s.padMode === 'armed_night' ? 'alarm_arm_night' : 'alarm_arm_away';
     else service = 'alarm_disarm';
     try {
+      const before = a.state;
       await this._hass.callService('alarm_control_panel', service, { entity_id: entity, code });
+      // Alarmo ne renvoie pas d'erreur sur un mauvais code : on vérifie que l'état change vraiment.
+      const ok = await new Promise((resolve) => {
+        const t0 = Date.now();
+        const tick = () => {
+          const st = this._st(entity);
+          if (st && st.state !== before) return resolve(true);
+          if (Date.now() - t0 > 2500) return resolve(false);
+          setTimeout(tick, 150);
+        };
+        tick();
+      });
+      if (!ok) throw new Error('refused');
       this._chime(service === 'alarm_disarm' ? 'disarm' : 'arm');
       setTimeout(() => this._closePad(), 250);
     } catch (err) {
       this._chime('error');
       s.code = '';
-      s.padError = 'Code incorrect, réessayez';
+      s.padError = 'Code refusé par l’alarme, réessayez';
       this._renderPad();
       this.$.pin.classList.remove('shake');
       void this.$.pin.offsetWidth;
@@ -981,7 +995,7 @@ class EcranMuralCard extends HTMLElement {
     clearTimeout(this._tempTimer);
     this._tempTimer = setTimeout(async () => {
       await this._call('climate', 'set_temperature', { entity_id: tc.entity, temperature: next });
-      setTimeout(() => { this._pendingSetpoint = null; this._updateThermo(); }, 4000);
+      this._pendingSince = Date.now();
     }, 900);
   }
 
