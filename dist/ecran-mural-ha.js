@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.17';
+const EM_VERSION = '0.1.18';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -696,17 +696,23 @@ class EcranMuralCard extends HTMLElement {
 
   /* Fenêtre fixe 6h → minuit : aujourd'hui (demain à partir de 21h). Heures passées = historique, à venir = prévisions. */
   _weatherDay() {
+    // Aujourd'hui si la journée 6h→24h peut être tracée en entier (historique depuis 6h + prévisions), sinon demain.
     const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 21 ? 1 : 0));
-    return d;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    if (now.getHours() >= 21) return tomorrow;
+    if (now.getHours() < 6) return today;
+    const six = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6).getTime();
+    const hasMorning = this._wHist && this._wHist[six] != null;
+    return hasMorning ? today : tomorrow;
   }
 
   async _loadWeatherHistory() {
     const c = this._config;
     if (!c.weather || !this._hass) return;
-    const day = this._weatherDay();
-    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 5);
     const now = new Date();
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 5);
     if (now <= start) { this._wHist = {}; return; }
     try {
       const r = await this._hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: now.toISOString(), entity_ids: [c.weather], minimal_response: false, no_attributes: false, significant_changes_only: false });
