@@ -621,9 +621,8 @@ class EcranMuralCard extends HTMLElement {
       const empty = this.$['camempty' + i];
       if (!img) return;
       const ok = s && s.state !== 'unavailable' && s.attributes.entity_picture;
-      img.style.display = ok ? '' : 'none';
-      empty.style.display = ok ? 'none' : '';
-      if (ok && !img.src) this._refreshCam(i);
+      if (!ok) { img.style.display = 'none'; empty.style.display = ''; }
+      else if (!img.src) this._refreshCam(i);
     });
   }
 
@@ -1163,7 +1162,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 
 .cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .cam{position:relative;height:166px;border-radius:24px;overflow:hidden;padding:0;text-align:left;background:rgba(8,10,14,0.55);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
-.cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cam-empty{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:#8A8E97}
 .cam-tag{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 .live{width:6px;height:6px;border-radius:50%;background:#FF6B4A;animation:blink 1.6s ease-in-out infinite}
