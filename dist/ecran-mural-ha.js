@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.24';
+const EM_VERSION = '0.1.25';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1238,9 +1238,9 @@ class EcranMuralCard extends HTMLElement {
     // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
     const direct = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
-    const base = await this._httpsBase();
+    const base = call.relay ? await this._httpsBase() : null;
     const relayPath = call.relay_path || '/local/community/ecran-mural-ha/visio.html';
-    const jitsi = (name) => (base ? `${base}${relayPath}?room=${encodeURIComponent(call.room)}&name=${encodeURIComponent(name)}` : direct(name));
+    const jitsi = (name) => (base && call.relay ? `${base}${relayPath}?room=${encodeURIComponent(call.room)}&name=${encodeURIComponent(name)}` : direct(name));
     this._callTargets = targets;
     for (const t of targets) {
       if (!t.notify) continue;
