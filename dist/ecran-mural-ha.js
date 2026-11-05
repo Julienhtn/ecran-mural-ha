@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.1';
+const EM_VERSION = '0.1.2';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -128,7 +128,7 @@ class EcranMuralCard extends HTMLElement {
       const cam = (c.cameras || [])[i];
       if (!cam) return '';
       return `<button class="cam press" data-act="cam" data-i="${i}" aria-label="Agrandir ${emEsc(cam.name)}">
-        <img data-ref="camimg${i}" alt="" />
+        <img data-ref="camimg${i}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='';this.nextElementSibling.lastElementChild.textContent='Touchez pour le direct'" onload="this.style.display='';this.nextElementSibling.style.display='none'" />
         <span class="cam-empty" data-ref="camempty${i}">${emIcon('video', 34, 'rgba(255,255,255,0.22)', 1.5)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>
         <span class="cam-tag">${cam.live === false ? 'Dernière image' : '<span class="live"></span>Direct'}</span>
         <span class="cam-time" data-ref="camtime${i}"></span>
@@ -598,7 +598,7 @@ class EcranMuralCard extends HTMLElement {
       const dot = tile.querySelector('.tdot');
       dot.style.background = c[4];
       dot.style.boxShadow = c[0] === '–' ? 'none' : `0 0 10px ${c[4]}`;
-      this.$['tempo' + i + 'v'].textContent = id ? c[0] : 'Non connecté';
+      this.$['tempo' + i + 'v'].textContent = c[0];
     });
   }
 
@@ -837,7 +837,7 @@ class EcranMuralCard extends HTMLElement {
   _renderPad() {
     const a = this._alarmInfo();
     const disarmed = a.state === 'disarmed';
-    this.$.padEyebrow.textContent = `Alarme · ${a.label}`;
+    this.$.padEyebrow.textContent = a.state === 'triggered' ? 'Alarme déclenchée' : `Alarme · ${a.label}`;
     this.$.padTitle.textContent = disarmed ? 'Armer la maison' : (a.state === 'arming' ? 'Annuler l’armement' : 'Désarmer');
     this.$.padSub.textContent = disarmed ? (this._config.code_to_arm ? 'Choisissez le mode, puis saisissez votre code.' : 'Choisissez le mode, puis validez avec votre code ou « 0000 ».') : `Saisissez votre code à ${this._config.code_length} chiffres.`;
     this.$.padModes.style.display = disarmed ? '' : 'none';
