@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appel visio</title>
+<style>html,body{margin:0;height:100%;background:#0B0C0E;color:#A3A6AD;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;font-size:18px}</style>
+</head>
+<body>
+<div>Connexion à l’appel…</div>
+<script>
+// Page relais : prévient Home Assistant qu'on a décroché (arrêt de la sonnerie), puis ouvre l'appel.
+(function () {
+  var p = new URLSearchParams(location.search);
+  var to = p.get('to') || '';
+  var hook = p.get('hook') || '';
+  var go = function () { if (/^https:\/\//.test(to)) location.replace(to); };
+  if (!hook) { go(); return; }
+  var done = false;
+  var finish = function () { if (!done) { done = true; go(); } };
+  setTimeout(finish, 1500);
+  try {
+    fetch('/api/webhook/' + encodeURIComponent(hook), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answered: true }) })
+      .then(finish, finish);
+  } catch (e) { finish(); }
+})();
+</script>
+</body>
+</html>

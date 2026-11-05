@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.28';
+const EM_VERSION = '0.1.29';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -445,6 +445,10 @@ class EcranMuralCard extends HTMLElement {
         this._unsubs.push(un);
       } catch (e) { /* netatmo absent */ }
     }
+    try {
+      const un = await conn.subscribeEvents(() => { this._ringing = false; clearTimeout(this._ringTimer); if (this.$ && this.$.callText && !this.$.callOv.hidden) this.$.callText.textContent = 'En ligne'; }, 'ecran_mural_decroche');
+      this._unsubs.push(un);
+    } catch (e) { /* noop */ }
     this._loadWeatherHistory();
     this._loadEnergy();
     clearInterval(this._energyTimer);
@@ -1251,11 +1255,14 @@ class EcranMuralCard extends HTMLElement {
     this._callTargets = targets;
     // Sonnerie : la notification est renvoyée toutes les 4 s (son à chaque fois) jusqu'à la réponse, au raccroché ou 45 s.
     const critical = call.critical !== false;
+    const hookBase = call.answer_webhook ? await this._httpsBase() : null;
     const ring = async (n) => {
       for (const t of targets) {
         if (!t.notify) continue;
         const [d, s] = t.notify.split('.');
-        const link = jitsi(t.name || 'Invité', true);
+        let link = jitsi(t.name || 'Invité', true);
+        // Lien via la page relais de Home Assistant : elle signale « décroché » pour arrêter la sonnerie.
+        if (hookBase && call.answer_webhook) link = `${hookBase}/local/community/ecran-mural-ha/repondre.html?hook=${encodeURIComponent(call.answer_webhook)}&to=${encodeURIComponent(link)}`;
         const push = critical ? { sound: { name: 'default', critical: 1, volume: Number(call.volume) || 0.8 }, 'interruption-level': 'critical' } : { sound: 'default', 'interruption-level': 'time-sensitive' };
         await this._call(d, s, { title: '📹 Appel visio', message: `${call.name || 'La maison'} vous appelle${n > 1 ? ' …' : ''}`, data: { url: link, clickAction: link, tag: 'ecran-visio', push, actions: [{ action: 'URI', title: 'Répondre', uri: link }] } });
       }
