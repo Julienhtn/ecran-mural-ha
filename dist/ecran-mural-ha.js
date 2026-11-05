@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.3.0';
+const EM_VERSION = '0.3.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1594,7 +1594,7 @@ class EcranMuralCard extends HTMLElement {
     (evs || []).forEach((e) => {
       const t = (e.when || 0) * 1000;
       if (e.entity_id === c.alarm && alarmTxt[e.state]) out.push({ t, txt: alarmTxt[e.state][0], kind: alarmTxt[e.state][1] });
-      else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) out.push({ t, txt: `${doorName[e.entity_id]} ${e.state === 'on' ? 'ouverte' : 'fermée'}`, kind: e.state === 'on' ? 'door' : 'door-off' });
+      else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) out.push({ t, txt: `${doorName[e.entity_id]} · ${e.state === 'on' ? 'ouverture' : 'fermeture'}`, kind: e.state === 'on' ? 'door' : 'door-off' });
       else if (e.domain === 'ecran_mural' || (e.name === 'Caméra' && e.message)) out.push({ t, txt: e.message.charAt(0).toUpperCase() + e.message.slice(1), kind: 'cam' });
     });
     out.sort((a, b) => b.t - a.t);
