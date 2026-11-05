@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.18';
+const EM_VERSION = '0.1.19';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -318,15 +318,15 @@ class EcranMuralCard extends HTMLElement {
       </div>
       <div class="keys" data-ref="keys">${keysHTML}</div>
       <div class="arm-choices" data-ref="armChoices" hidden>
-        <button class="arm-tile arm-away press" data-act="mode" data-m="armed_away">
-          <span class="arm-ico">${emIcon('away', 56, 'currentColor', 1.6)}</span>
-          <span class="arm-name">Absent</span>
-          <span class="arm-sub">Toute la maison</span>
-        </button>
         <button class="arm-tile arm-night press" data-act="mode" data-m="armed_night">
           <span class="arm-ico">${emIcon('moon', 56, 'currentColor', 1.6)}</span>
           <span class="arm-name">Nuit</span>
           <span class="arm-sub">Périmètre seulement</span>
+        </button>
+        <button class="arm-tile arm-away press" data-act="mode" data-m="armed_away">
+          <span class="arm-ico">${emIcon('away', 56, 'currentColor', 1.6)}</span>
+          <span class="arm-name">Absent</span>
+          <span class="arm-sub">Toute la maison</span>
         </button>
       </div>
     </div>
