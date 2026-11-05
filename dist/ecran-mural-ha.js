@@ -128,7 +128,7 @@ class EcranMuralCard extends HTMLElement {
       const cam = (c.cameras || [])[i];
       if (!cam) return '';
       return `<button class="cam press" data-act="cam" data-i="${i}" aria-label="Agrandir ${emEsc(cam.name)}">
-        <img data-ref="camimg${i}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='';this.nextElementSibling.lastElementChild.textContent='Touchez pour le direct'" onload="this.style.display='';this.nextElementSibling.style.display='none'" />
+        <img data-ref="camimg${i}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='';this.nextElementSibling.lastElementChild.textContent='Touchez pour le direct'" onload="this.style.display='block';this.nextElementSibling.style.display='none'" />
         <span class="cam-empty" data-ref="camempty${i}">${emIcon('video', 34, 'rgba(255,255,255,0.22)', 1.5)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>
         <span class="cam-tag">${cam.live === false ? 'Dernière image' : '<span class="live"></span>Direct'}</span>
         <span class="cam-time" data-ref="camtime${i}"></span>
