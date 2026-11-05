@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.22';
+const EM_VERSION = '0.1.23';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1236,7 +1236,7 @@ class EcranMuralCard extends HTMLElement {
     const targets = which === 'all' ? (call.targets || []) : [(call.targets || [])[Number(which)]].filter(Boolean);
     if (!call.room) { this._toast('Aucune salle de visio configurée (call.room)'); return; }
     // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
-    const jitsi = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
+    const jitsi = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.startAudioMuted=99&config.startVideoMuted=99&config.startAudioOnly=false&config.startSilent=false&config.disableInitialGUM=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     this._callTargets = targets;
     for (const t of targets) {
       if (!t.notify) continue;
