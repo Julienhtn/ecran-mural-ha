@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.5';
+const EM_VERSION = '0.1.7';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -47,7 +47,6 @@ const EM_DEFAULT_CONFIG = {
   weather: 'weather.maison',
   outdoor_temperature: null,
   code_length: 4,
-  code_to_arm: true,
   idle_timeout: 60,
   sounds: true,
   accent: '#F2B544',
@@ -294,7 +293,7 @@ class EcranMuralCard extends HTMLElement {
         <div class="pin" data-ref="pin" aria-live="polite">${dots}</div>
         <p class="pin-err" data-ref="padErr"></p>
       </div>
-      <div class="keys">${keysHTML}</div>
+      <div class="keys" data-ref="keys">${keysHTML}</div>
     </div>
   </div>
 
@@ -755,12 +754,59 @@ class EcranMuralCard extends HTMLElement {
           r.days = ((d && d[stat]) || []).map((x) => Number(x.change || 0)).slice(-7);
         } catch (x) { /* noop */ }
       }
+      if (e.tempo && stat && e.source !== 'gazpar') {
+        try { Object.assign(r, await this._tempoCost(stat, e.tempo, Number(e.price) || 0)); } catch (x) { /* noop */ }
+      }
       const k = Number(e.scale) || 1;
       if (k !== 1) { ['month', 'year', 'monthLY', 'yearLY'].forEach((key) => { if (r[key] != null) r[key] *= k; }); r.days = r.days.map((x) => x * k); }
       res.push(r);
     }
     this._energy = res;
     this._renderEnergy();
+  }
+
+  /* Coût Tempo exact : chaque heure consommée × prix de la couleur du jour (6h→6h) et de la plage HP/HC. */
+  async _tempoCost(stat, t, fallback) {
+    const now = new Date();
+    const yStart = new Date(now.getFullYear(), 0, 1);
+    const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const rows = ((await this._hass.callWS({ type: 'recorder/statistics_during_period', start_time: yStart.toISOString(), statistic_ids: [stat], period: 'hour', types: ['change'] })) || {})[stat] || [];
+    const colors = {};
+    if (t.calendar) {
+      const evs = await this._hass.callApi('GET', `calendars/${t.calendar}?start=${encodeURIComponent(new Date(yStart.getTime() - 86400000).toISOString())}&end=${encodeURIComponent(new Date(now.getTime() + 86400000).toISOString())}`);
+      (evs || []).forEach((ev) => {
+        const sm = String(ev.summary || '');
+        const c = /🔴|rouge|red/i.test(sm) ? 'rouge' : /⚪|blanc|white/i.test(sm) ? 'blanc' : /🔵|bleu|blue/i.test(sm) ? 'bleu' : null;
+        const d = ev.start && (ev.start.date || String(ev.start.dateTime || ev.start).slice(0, 10));
+        if (c && d) colors[d] = c;
+      });
+    }
+    const hcStart = t.hc_start != null ? t.hc_start : 22, hcEnd = t.hc_end != null ? t.hc_end : 6;
+    const pad = (n) => String(n).padStart(2, '0');
+    let costYear = 0, costMonth = 0;
+    rows.forEach((x) => {
+      const kwh = Number(x.change || 0);
+      if (!kwh) return;
+      const d = new Date(typeof x.start === 'number' ? x.start : Date.parse(x.start));
+      const h = d.getHours();
+      const tempoDay = new Date(d.getTime() - (h < 6 ? 86400000 : 0));
+      const key = `${tempoDay.getFullYear()}-${pad(tempoDay.getMonth() + 1)}-${pad(tempoDay.getDate())}`;
+      const col = colors[key] || 'bleu';
+      const hc = hcStart > hcEnd ? (h >= hcStart || h < hcEnd) : (h >= hcStart && h < hcEnd);
+      const pr = (t.prices && t.prices[col]) ? Number(t.prices[col][hc ? 0 : 1]) : fallback;
+      const c = kwh * pr;
+      costYear += c;
+      if (d >= mStart) costMonth += c;
+    });
+    return rows.length ? { costMonth, costYear } : {};
+  }
+
+  _fixedShare(e, per) {
+    const f = Number(e.fixed_month) || 0;
+    if (!f) return 0;
+    const now = new Date();
+    if (per === 'month') return f * now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return f * 12 * (now - new Date(now.getFullYear(), 0, 1)) / (new Date(now.getFullYear() + 1, 0, 1) - new Date(now.getFullYear(), 0, 1));
   }
 
   _renderEnergy() {
@@ -779,7 +825,8 @@ class EcranMuralCard extends HTMLElement {
       const unit = e.unit || (e.kind === 'water' ? 'm³' : 'kWh');
       const costEl = this.$['encost' + i], volEl = this.$['envol' + i], dEl = this.$['endelta' + i], barsEl = this.$['enbars' + i];
       if (v == null) { costEl.textContent = '–'; volEl.textContent = (e.statistic || e.entity) ? 'Pas encore de données' : 'Non connecté'; dEl.textContent = ''; dEl.style.display = 'none'; barsEl.innerHTML = ''; return; }
-      const cost = e.price != null ? v * Number(e.price) : null;
+      const varCost = r && (per === 'month' ? r.costMonth : r.costYear) != null ? (per === 'month' ? r.costMonth : r.costYear) : (e.price != null ? v * Number(e.price) : null);
+      const cost = varCost != null ? varCost + this._fixedShare(e, per) : null;
       if (cost != null) { total += cost; hasCost = true; }
       costEl.textContent = cost != null ? `${emFr(cost, cost < 100 ? 2 : 0)} €` : `${emFr(v, v < 100 ? 1 : 0)} ${unit}`;
       volEl.textContent = cost != null ? `${emFr(v, v < 100 ? 1 : 0)} ${unit}` : '';
@@ -812,7 +859,10 @@ class EcranMuralCard extends HTMLElement {
     switch (act) {
       case 'pad': this._openPad(); break;
       case 'closepad': this._closePad(); break;
-      case 'mode': this._state.padMode = el.dataset.m; this._renderPad(); break;
+      case 'mode':
+        this._state.padMode = el.dataset.m;
+        if (this._alarmInfo().state === 'disarmed' && !this._armNeedsCode()) { this._state.code = ''; this._submitCode(); } else this._renderPad();
+        break;
       case 'key': this._key(el.dataset.k); break;
       case 'scene': this._scene(Number(i)); break;
       case 'cover': this._cover(Number(i), el.dataset.dir); break;
@@ -862,12 +912,25 @@ class EcranMuralCard extends HTMLElement {
     this.$.padOv.hidden = true;
   }
 
+  _armNeedsCode() {
+    if (this._config.code_to_arm === false) return false;
+    const st = this._st(this._config.alarm);
+    if (st && st.attributes.code_arm_required === false) return false;
+    return true;
+  }
+
   _renderPad() {
     const a = this._alarmInfo();
     const disarmed = a.state === 'disarmed';
     this.$.padEyebrow.textContent = a.state === 'triggered' ? 'Alarme déclenchée' : `Alarme · ${a.label}`;
     this.$.padTitle.textContent = disarmed ? 'Armer la maison' : (a.state === 'arming' ? 'Annuler l’armement' : 'Désarmer');
-    this.$.padSub.textContent = disarmed ? (this._config.code_to_arm ? 'Choisissez le mode, puis saisissez votre code.' : 'Choisissez le mode, puis validez avec votre code ou « 0000 ».') : `Saisissez votre code à ${this._config.code_length} chiffres.`;
+    const noCode = disarmed && !this._armNeedsCode();
+    this.$.padSub.textContent = noCode ? 'Choisissez le mode : l’alarme s’arme tout de suite.' : disarmed ? 'Choisissez le mode, puis saisissez votre code.' : `Saisissez votre code à ${this._config.code_length} chiffres.`;
+    this.$.keys.style.visibility = noCode ? 'hidden' : '';
+    this.$.pin.style.display = noCode ? 'none' : '';
+    this.$.padModes.classList.toggle('modes-big', noCode);
+    this.$.modeAway.textContent = noCode ? 'Armer · Absent' : 'Absent';
+    this.$.modeNight.textContent = noCode ? 'Armer · Nuit' : 'Nuit';
     this.$.padModes.style.display = disarmed ? '' : 'none';
     this.$.modeAway.classList.toggle('on', this._state.padMode === 'armed_away');
     this.$.modeNight.classList.toggle('on', this._state.padMode === 'armed_night');
@@ -897,7 +960,7 @@ class EcranMuralCard extends HTMLElement {
     else service = 'alarm_disarm';
     try {
       const before = a.state;
-      await this._hass.callService('alarm_control_panel', service, { entity_id: entity, code });
+      await this._hass.callService('alarm_control_panel', service, code ? { entity_id: entity, code } : { entity_id: entity });
       // Alarmo ne renvoie pas d'erreur sur un mauvais code : on vérifie que l'état change vraiment.
       const ok = await new Promise((resolve) => {
         const t0 = Date.now();
@@ -915,7 +978,7 @@ class EcranMuralCard extends HTMLElement {
     } catch (err) {
       this._chime('error');
       s.code = '';
-      s.padError = 'Code refusé par l’alarme, réessayez';
+      s.padError = code ? 'Code refusé par l’alarme, réessayez' : 'L’alarme ne s’est pas armée : une porte est peut-être ouverte';
       this._renderPad();
       this.$.pin.classList.remove('shake');
       void this.$.pin.offsetWidth;
@@ -1272,6 +1335,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .modes{display:flex;gap:10px;margin-top:8px}
 .mode{padding:12px 20px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);font-size:16px;font-weight:500;background:rgba(255,255,255,0.05)}
 .mode.on{background:#F2F1EE;color:#0B0C0E}
+.modes-big{flex-direction:column;gap:14px;margin-top:18px}.modes-big .mode{padding:22px 28px;font-size:22px;border-radius:24px;text-align:left;background:rgba(255,255,255,0.06);color:#F2F1EE}.modes-big .mode.on{background:rgba(255,255,255,0.06);color:#F2F1EE}
 .pin{display:flex;gap:18px;margin-top:22px}
 .pin.shake{animation:shake .4s ease}
 .pin-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid #F2F1EE;transition:background .15s ease,box-shadow .3s ease}
