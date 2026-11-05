@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.2.0';
+const EM_VERSION = '0.2.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1692,7 +1692,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .viewport.mobile{height:auto;min-height:100vh;overflow:visible}
 .mobile .stage{position:relative;width:100%;height:auto;min-height:100vh;transform:none!important;overflow:hidden}
 .mobile .bg{position:fixed}
-.mobile .grid{display:flex;flex-direction:column;gap:12px;padding:12px 12px calc(24px + env(safe-area-inset-bottom));height:auto}
+.mobile .grid{display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom));height:auto}
 .mobile .col{display:contents}
 .mobile .card{border-radius:22px;padding:16px}
 .mobile .clock{order:0;padding:14px 16px}
