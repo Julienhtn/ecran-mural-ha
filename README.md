@@ -40,7 +40,8 @@ energy:
   - { name: Gaz, kind: gas, source: gazpar, entity: sensor.gazpar, price: 0.11 }   # lit l'historique GRDF directement
   - { name: Eau, kind: water, statistic: sensor.ileo_index_mode_ghost, scale: 0.001, unit: m³, price: 4.2 }   # scale : litres → m³
 call:
-  room: https://meet.jit.si/ma-salle-secrete
+  room: https://meet.ffmuc.net/ma-salle-secrete-a-changer   # Jitsi sans compte (Freifunk München)
+  name: Maison
   targets:
     - { name: Julien, notify: notify.mobile_app_iphone_de_julien, color: "#F2B544" }
     - { name: Julie, notify: notify.mobile_app_iphone_de_julie, color: "#8B9CFF" }

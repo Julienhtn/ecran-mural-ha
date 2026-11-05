@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.19';
+const EM_VERSION = '0.1.20';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1236,21 +1236,24 @@ class EcranMuralCard extends HTMLElement {
     const call = this._config.call || {};
     const targets = which === 'all' ? (call.targets || []) : [(call.targets || [])[Number(which)]].filter(Boolean);
     if (!call.room) { this._toast('Aucune salle de visio configurée (call.room)'); return; }
+    // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
+    const jitsi = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     this._callTargets = targets;
     for (const t of targets) {
       if (!t.notify) continue;
       const [d, s] = t.notify.split('.');
-      await this._call(d, s, { title: 'Appel visio', message: 'On vous appelle depuis la maison', data: { url: call.room, clickAction: call.room, tag: 'ecran-visio', push: { 'interruption-level': 'time-sensitive' } } });
+      const link = jitsi(t.name || 'Invité');
+      await this._call(d, s, { title: 'Appel visio', message: 'On vous appelle depuis la maison', data: { url: link, clickAction: link, tag: 'ecran-visio', push: { 'interruption-level': 'time-sensitive' } } });
     }
     this.$.callPick.hidden = true;
     this.$.callLive.hidden = false;
     this.$.callText.textContent = targets.length > 1 ? 'Ça sonne chez tout le monde · le premier qui répond' : `Ça sonne chez ${targets[0] ? targets[0].name : ''}`;
     if (window.isSecureContext) {
-      this.$.callFrame.innerHTML = `<iframe src="${emEsc(call.room)}" allow="camera; microphone; fullscreen; display-capture; autoplay" title="Appel visio"></iframe>`;
+      this.$.callFrame.innerHTML = `<iframe src="${emEsc(jitsi(call.name || 'Maison'))}" allow="camera; microphone; fullscreen; display-capture; autoplay" title="Appel visio"></iframe>`;
     } else {
       // Page en http : le navigateur bloque caméra et micro dans l'écran. On ouvre la salle (https) en plein écran à part.
       this.$.callFrame.innerHTML = '<div class="call-ext">La visio s’ouvre dans une fenêtre à part.<br>Revenez ici pour raccrocher.</div>';
-      window.open(call.room, '_blank');
+      window.open(jitsi(call.name || 'Maison'), '_blank');
     }
   }
 
