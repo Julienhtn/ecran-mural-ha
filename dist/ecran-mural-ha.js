@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.12';
+const EM_VERSION = '0.1.14';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -200,7 +200,7 @@ class EcranMuralCard extends HTMLElement {
       </section>
 
       <section class="card weather">
-        <div class="row-between"><h2>Prochaines 24 h</h2><p class="small"><span class="warm" data-ref="wmax"></span>  <span class="cool" data-ref="wmin"></span></p></div>
+        <div class="row-between"><h2 data-ref="wTitle">Aujourd’hui</h2><p class="small"><span class="warm" data-ref="wmax"></span>  <span class="cool" data-ref="wmin"></span></p></div>
         <svg viewBox="0 0 248 108" width="100%" height="108" data-ref="wchart" role="img" aria-label="Température heure par heure"></svg>
         <div class="row-between"><h3>Précipitations</h3><p class="small cool" data-ref="rainTotal"></p></div>
         <div class="rain" data-ref="rain" role="img" aria-label="Précipitations heure par heure"></div>
@@ -421,6 +421,7 @@ class EcranMuralCard extends HTMLElement {
         this._unsubs.push(un);
       } catch (e) { /* netatmo absent */ }
     }
+    this._loadWeatherHistory();
     this._loadEnergy();
     clearInterval(this._energyTimer);
     this._energyTimer = setInterval(() => this._loadEnergy(), 15 * 60 * 1000);
@@ -668,13 +669,64 @@ class EcranMuralCard extends HTMLElement {
     this.$.idleTime.textContent = t;
     const out = this.$.outT.textContent;
     this.$.idleDate.textContent = out && out !== '–' ? `${date} · ${out} dehors` : date;
-    if (this._lastHour !== d.getHours()) { this._lastHour = d.getHours(); if (this._hass) this._updateMoment(); }
+    if (this._lastHour !== d.getHours()) { this._lastHour = d.getHours(); if (this._hass) { this._updateMoment(); this._loadWeatherHistory(); } }
+  }
+
+  /* Fenêtre fixe 6h → minuit : aujourd'hui (demain à partir de 21h). Heures passées = historique, à venir = prévisions. */
+  _weatherDay() {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 21 ? 1 : 0));
+    return d;
+  }
+
+  async _loadWeatherHistory() {
+    const c = this._config;
+    if (!c.weather || !this._hass) return;
+    const day = this._weatherDay();
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 5);
+    const now = new Date();
+    if (now <= start) { this._wHist = {}; return; }
+    try {
+      const r = await this._hass.callWS({ type: 'history/history_during_period', start_time: start.toISOString(), end_time: now.toISOString(), entity_ids: [c.weather], minimal_response: false, no_attributes: false, significant_changes_only: false });
+      const list = (r && r[c.weather]) || [];
+      const pts = list.map((x) => ({ t: (x.lu || x.lc || 0) * 1000, v: x.a && x.a.temperature != null ? Number(x.a.temperature) : null })).filter((x) => x.v != null);
+      const out = {};
+      for (let h = 6; h <= 24; h++) {
+        const t = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h).getTime();
+        if (t > now.getTime()) break;
+        let v = null;
+        pts.forEach((p) => { if (p.t <= t) v = p.v; });
+        if (v == null && pts.length) v = pts[0].v;
+        if (v != null) out[t] = v;
+      }
+      this._wHist = out;
+    } catch (e) { this._wHist = this._wHist || {}; }
+    this._renderWeather();
   }
 
   _renderWeather() {
-    const fc = (this._forecast || []).slice(0, 24);
     const svg = this.$.wchart;
-    if (fc.length < 2) {
+    const day = this._weatherDay();
+    const now = Date.now();
+    const isToday = day.getDate() === new Date().getDate();
+    this.$.wTitle.textContent = `${isToday ? 'Aujourd’hui' : 'Demain'} · 6h – 24h`;
+    const fcMap = {};
+    (this._forecast || []).forEach((f) => { const t = new Date(f.datetime); t.setMinutes(0, 0, 0); fcMap[t.getTime()] = f; });
+    const hist = this._wHist || {};
+    const slots = [];
+    for (let h = 6; h <= 24; h++) {
+      const t = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h).getTime();
+      const f = fcMap[t];
+      const past = t + 3600000 <= now;
+      let temp = f ? Number(f.temperature) : (hist[t] != null ? hist[t] : null);
+      if (temp == null && !f && t <= now + 3600000) {
+        const cur = this._st(this._config.weather);
+        if (cur && t > now - 3600000) temp = Number(cur.attributes.temperature);
+      }
+      slots.push({ h, t, temp, rain: f ? Number(f.precipitation || 0) : null, past: past && !f });
+    }
+    const known = slots.filter((x) => x.temp != null);
+    if (known.length < 2) {
       svg.innerHTML = '<text x="124" y="58" class="svgt" text-anchor="middle">Prévisions indisponibles</text>';
       this.$.rain.innerHTML = '';
       this.$.axis.innerHTML = '';
@@ -683,32 +735,41 @@ class EcranMuralCard extends HTMLElement {
       this.$.rainTotal.textContent = '';
       return;
     }
-    const temps = fc.map((f) => Number(f.temperature));
+    const temps = known.map((x) => x.temp);
     const tmin = Math.min(...temps), tmax = Math.max(...temps);
     const span = Math.max(1, tmax - tmin);
-    const x0 = 10, x1 = 238, yT = 22, yB = 86, n = fc.length - 1;
-    const pts = temps.map((t, i) => [x0 + i * (x1 - x0) / n, yT + (tmax - t) / span * (yB - yT)]);
-    const p = pts.map((q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
-    const iMax = temps.indexOf(tmax), iMin = temps.indexOf(tmin);
-    const hr = (f) => `${new Date(f.datetime).getHours()}h`;
-    svg.innerHTML = `<polygon points="${p} ${x1},96 ${x0},96" fill="rgba(242,181,68,0.08)"></polygon>
-      <polyline points="${p}" fill="none" stroke="#F2B544" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      <circle cx="${pts[iMax][0].toFixed(1)}" cy="${pts[iMax][1].toFixed(1)}" r="4.5" fill="#F2B544"></circle>
-      <text x="${pts[iMax][0].toFixed(1)}" y="${(pts[iMax][1] - 9).toFixed(1)}" fill="#F2B544" class="svgt" text-anchor="middle">${emFr(tmax, 0)}°</text>
-      <circle cx="${pts[iMin][0].toFixed(1)}" cy="${pts[iMin][1].toFixed(1)}" r="4.5" fill="#7FB0FF"></circle>
-      <text x="${pts[iMin][0].toFixed(1)}" y="${(pts[iMin][1] + 18).toFixed(1)}" fill="#7FB0FF" class="svgt" text-anchor="middle">${emFr(tmin, 0)}°</text>
-      <text x="10" y="106" class="svgt">${hr(fc[0])}</text>
-      <text x="124" y="106" class="svgt" text-anchor="middle">${hr(fc[Math.floor(n / 2)])}</text>
-      <text x="238" y="106" class="svgt" text-anchor="end">${hr(fc[n])}</text>`;
-    svg.setAttribute('aria-label', `Température des prochaines 24 heures, maximum ${emFr(tmax, 0)} degrés, minimum ${emFr(tmin, 0)} degrés`);
+    const x0 = 10, x1 = 238, yT = 22, yB = 86, n = slots.length - 1;
+    const X = (i) => x0 + i * (x1 - x0) / n;
+    const Y = (v) => yT + (tmax - v) / span * (yB - yT);
+    const pt = (i) => `${X(i).toFixed(1)},${Y(slots[i].temp).toFixed(1)}`;
+    const idx = slots.map((x, i) => (x.temp != null ? i : -1)).filter((i) => i >= 0);
+    const pastIdx = idx.filter((i) => slots[i].past);
+    const futIdx = idx.filter((i) => !slots[i].past);
+    if (pastIdx.length && futIdx.length) futIdx.unshift(pastIdx[pastIdx.length - 1]);
+    const line = (arr) => arr.map(pt).join(' ');
+    const iMax = idx.find((i) => slots[i].temp === tmax), iMin = idx.find((i) => slots[i].temp === tmin);
+    const nowX = isToday && now > slots[0].t && now < slots[n].t ? x0 + ((now - slots[0].t) / (slots[n].t - slots[0].t)) * (x1 - x0) : null;
+    svg.innerHTML = `${futIdx.length > 1 ? `<polygon points="${line(futIdx)} ${X(futIdx[futIdx.length - 1]).toFixed(1)},96 ${X(futIdx[0]).toFixed(1)},96" fill="rgba(242,181,68,0.08)"></polygon>` : ''}
+      ${pastIdx.length > 1 ? `<polyline points="${line(pastIdx)}" fill="none" stroke="rgba(242,181,68,0.45)" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+      ${futIdx.length > 1 ? `<polyline points="${line(futIdx)}" fill="none" stroke="#F2B544" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>` : ''}
+      ${nowX != null ? `<line x1="${nowX.toFixed(1)}" x2="${nowX.toFixed(1)}" y1="14" y2="96" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="2 3"></line>` : ''}
+      <circle cx="${X(iMax).toFixed(1)}" cy="${Y(tmax).toFixed(1)}" r="4.5" fill="#F2B544"></circle>
+      <text x="${X(iMax).toFixed(1)}" y="${(Y(tmax) - 9).toFixed(1)}" fill="#F2B544" class="svgt" text-anchor="middle">${emFr(tmax, 0)}°</text>
+      <circle cx="${X(iMin).toFixed(1)}" cy="${Y(tmin).toFixed(1)}" r="4.5" fill="#7FB0FF"></circle>
+      <text x="${X(iMin).toFixed(1)}" y="${(Y(tmin) + 18).toFixed(1)}" fill="#7FB0FF" class="svgt" text-anchor="middle">${emFr(tmin, 0)}°</text>`;
+    svg.setAttribute('aria-label', `Température de 6 heures à minuit, maximum ${emFr(tmax, 0)} degrés, minimum ${emFr(tmin, 0)} degrés`);
     this.$.wmax.textContent = `↑ ${emFr(tmax, 0)}°`;
     this.$.wmin.textContent = `↓ ${emFr(tmin, 0)}°`;
-    const rain = fc.map((f) => Number(f.precipitation || 0));
-    const rmax = Math.max(0.8, ...rain);
-    this.$.rain.innerHTML = rain.map((v) => `<span style="height:${Math.max(3, Math.round(v / rmax * 56))}px;background:${v > 0 ? '#7FB0FF' : 'rgba(255,255,255,0.08)'}"></span>`).join('');
-    this.$.rainTotal.textContent = `${emFr(rain.reduce((a, b) => a + b, 0), 1)} mm`;
-    const marks = [0, 6, 12, 18, n].map((i) => `<span>${hr(fc[Math.min(i, n)])}</span>`).join('');
-    this.$.axis.innerHTML = marks;
+    const bars = slots.slice(0, n);
+    const rmax = Math.max(0.8, ...bars.map((x) => x.rain || 0));
+    this.$.rain.innerHTML = bars.map((x) => {
+      const v = x.rain;
+      const bg = v == null ? 'rgba(255,255,255,0.04)' : v > 0 ? '#7FB0FF' : 'rgba(255,255,255,0.08)';
+      return `<span style="height:${Math.max(3, Math.round((v || 0) / rmax * 56))}px;background:${bg}"></span>`;
+    }).join('');
+    const tot = bars.reduce((a, x) => a + (x.rain || 0), 0);
+    this.$.rainTotal.textContent = `${emFr(tot, 1)} mm`;
+    this.$.axis.innerHTML = ['6h', '12h', '18h', '24h'].map((l) => `<span>${l}</span>`).join('');
   }
 
   async _statChange(id, period) {
@@ -1146,7 +1207,13 @@ class EcranMuralCard extends HTMLElement {
     this.$.callPick.hidden = true;
     this.$.callLive.hidden = false;
     this.$.callText.textContent = targets.length > 1 ? 'Ça sonne chez tout le monde · le premier qui répond' : `Ça sonne chez ${targets[0] ? targets[0].name : ''}`;
-    this.$.callFrame.innerHTML = `<iframe src="${emEsc(call.room)}" allow="camera; microphone; fullscreen; display-capture; autoplay" title="Appel visio"></iframe>`;
+    if (window.isSecureContext) {
+      this.$.callFrame.innerHTML = `<iframe src="${emEsc(call.room)}" allow="camera; microphone; fullscreen; display-capture; autoplay" title="Appel visio"></iframe>`;
+    } else {
+      // Page en http : le navigateur bloque caméra et micro dans l'écran. On ouvre la salle (https) en plein écran à part.
+      this.$.callFrame.innerHTML = '<div class="call-ext">La visio s’ouvre dans une fenêtre à part.<br>Revenez ici pour raccrocher.</div>';
+      window.open(call.room, '_blank');
+    }
   }
 
   async _hangup() {
@@ -1406,6 +1473,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .avatar{width:72px;height:72px;border-radius:50%;border:3px solid rgba(20,22,27,0.9);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:500;color:#0B0C0E}
 .call-live{gap:14px}
 .call-frame{flex:1;border-radius:24px;overflow:hidden;background:#000}
+.call-ext{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.5;color:#A3A6AD}
 .call-frame iframe{width:100%;height:100%;border:0}
 .call-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 
