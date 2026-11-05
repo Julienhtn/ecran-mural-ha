@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.26';
+const EM_VERSION = '0.1.27';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -126,6 +126,8 @@ class EcranMuralCard extends HTMLElement {
     clearInterval(this._camTimer);
     clearInterval(this._energyTimer);
     clearTimeout(this._coverTimer);
+    clearTimeout(this._beepTimer);
+    this._beepState = null;
     window.removeEventListener('pointerdown', this._onDown, true);
     if (this._ro) this._ro.disconnect();
     this._unsubAll();
@@ -538,6 +540,7 @@ class EcranMuralCard extends HTMLElement {
     if (a.state === 'pending' && this._prevAlarm !== 'pending') { this._wake(); this._openPad(); }
     if (a.state === 'triggered' && this._prevAlarm !== 'triggered') { this._wake(); this._openPad(); }
     if (this._prevAlarm && this._prevAlarm !== a.state && this._state.pad && a.state === 'disarmed' && this._prevAlarm !== 'disarmed') this._closePad();
+    this._beepFor(a.state);
     this._prevAlarm = a.state;
     if (this._state.pad && !this._submitting) this._renderPad();
   }
@@ -1309,6 +1312,54 @@ class EcranMuralCard extends HTMLElement {
     this._state.idle = false;
     this.$.idleOv.hidden = true;
     this._refreshCams();
+  }
+
+  /* Bips d'ambiance : délai d'entrée = 2 bips/s (plus rapides sur la fin), armement = 1 bip doux toutes les 2 s, alarme = sirène. */
+  _beepFor(state) {
+    if (this._beepState === state) return;
+    this._beepState = state;
+    clearTimeout(this._beepTimer);
+    if (this._config.sounds === false) return;
+    const st = this._st(this._config.alarm);
+    const started = Date.now();
+    const delay = st && st.attributes.delay ? Number(st.attributes.delay) * 1000 : 30000;
+    const loop = () => {
+      if (this._beepState !== state) return;
+      let next = 1000;
+      if (state === 'pending') {
+        const left = delay - (Date.now() - started);
+        this._tone([1760, 1760], 0.09, 0.12, 'square', 0.07);
+        next = left < 10000 ? 500 : 1000;
+      } else if (state === 'arming') {
+        this._tone([1318], 0.12, 0, 'sine', 0.05);
+        next = 2000;
+      } else if (state === 'triggered') {
+        this._tone([880, 1175, 880, 1175], 0.22, 0.02, 'sawtooth', 0.12);
+        next = 1000;
+      } else return;
+      this._beepTimer = setTimeout(loop, next);
+    };
+    if (['pending', 'arming', 'triggered'].includes(state)) loop();
+  }
+
+  _tone(freqs, dur, gap, type, vol) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = this._ctx || (this._ctx = new AC());
+      if (ctx.state === 'suspended') ctx.resume();
+      freqs.forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        const t = ctx.currentTime + i * (dur + gap);
+        o.type = type; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+        g.gain.setValueAtTime(vol, t + dur - 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + dur + 0.02);
+      });
+    } catch (e) { /* noop */ }
   }
 
   /* Sons */
