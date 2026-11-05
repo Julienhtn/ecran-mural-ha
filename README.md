@@ -38,7 +38,7 @@ tempo: { today: sensor.rte_tempo_couleur_actuelle, tomorrow: sensor.rte_tempo_pr
 energy:
   - { name: Électricité, kind: elec, statistic: sensor.linky_energie, price: 0.1952 }
   - { name: Gaz, kind: gas, statistic: sensor.gazpar_energie, price: 0.11 }
-  - { name: Eau, kind: water, statistic: sensor.ileo_consommation, unit: m³, price: 4.2 }
+  - { name: Eau, kind: water, statistic: sensor.ileo_compteur_eau_index, scale: 0.001, unit: m³, price: 4.2 }   # scale : litres → m³
 call:
   room: https://meet.jit.si/ma-salle-secrete
   targets:
