@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.30';
+const EM_VERSION = '0.1.31';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -679,8 +679,8 @@ class EcranMuralCard extends HTMLElement {
     const s = cam && this._st(cam.entity);
     const img = this.$['camimg' + i], empty = this.$['camempty' + i], live = this.$['camlive' + i];
     img.style.display = 'none';
-    const canStream = s && (s.attributes.supported_features & 2) && customElements.get('ha-camera-stream');
-    if (!canStream) { empty.style.display = ''; empty.lastElementChild.textContent = 'Touchez pour le direct'; return; }
+    const canStream = cam.live_thumb && s && (s.attributes.supported_features & 2) && customElements.get('ha-camera-stream');
+    if (!canStream) { empty.style.display = ''; empty.lastElementChild.textContent = 'Image indisponible · touchez pour le direct'; return; }
     this._liveThumb = this._liveThumb || {};
     this._liveThumb[i] = true;
     this._startLiveThumb(i);
@@ -690,7 +690,9 @@ class EcranMuralCard extends HTMLElement {
     const cam = (this._config.cameras || [])[i];
     const s = cam && this._st(cam.entity);
     const live = this.$['camlive' + i], empty = this.$['camempty' + i];
-    if (!live || !s || this._state.idle || live.firstChild) return;
+    if (!live || !s || this._state.idle) return;
+    empty.style.display = 'none';
+    if (live.firstChild) return;
     const st = document.createElement('ha-camera-stream');
     st.hass = this._hass; st.stateObj = s; st.muted = true; st.controls = false; st.className = 'stream';
     live.appendChild(st);
