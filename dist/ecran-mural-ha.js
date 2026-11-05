@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.25';
+const EM_VERSION = '0.1.26';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1236,7 +1236,10 @@ class EcranMuralCard extends HTMLElement {
     const targets = which === 'all' ? (call.targets || []) : [(call.targets || [])[Number(which)]].filter(Boolean);
     if (!call.room) { this._toast('Aucune salle de visio configurée (call.room)'); return; }
     // Liens Jitsi : pas d'écran « Entrez votre nom », pas de renvoi vers l'appli, nom affiché pré-rempli.
-    const direct = (name) => `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
+    // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
+    const isVdo = /vdo\.ninja/.test(call.room);
+    const vdo = (name) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&videodevice=1&audiodevice=1&label=${encodeURIComponent(name)}`;
+    const direct = (name) => isVdo ? vdo(name) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
     const relayPath = call.relay_path || '/local/community/ecran-mural-ha/visio.html';
@@ -1252,7 +1255,7 @@ class EcranMuralCard extends HTMLElement {
     this.$.callLive.hidden = false;
     this.$.callText.textContent = targets.length > 1 ? 'Ça sonne chez tout le monde · le premier qui répond' : `Ça sonne chez ${targets[0] ? targets[0].name : ''}`;
     if (window.isSecureContext) {
-      this.$.callFrame.innerHTML = `<iframe src="${emEsc(jitsi(call.name || 'Maison'))}" allow="camera; microphone; fullscreen; display-capture; autoplay" title="Appel visio"></iframe>`;
+      this.$.callFrame.innerHTML = `<iframe src="${emEsc(jitsi(call.name || 'Maison'))}" allow="camera *; microphone *; fullscreen; display-capture; autoplay; screen-wake-lock" title="Appel visio"></iframe>`;
     } else {
       // Page en http : le navigateur bloque caméra et micro dans l'écran. On ouvre la salle (https) en plein écran à part.
       this.$.callFrame.innerHTML = '<div class="call-ext">La visio s’ouvre dans une fenêtre à part.<br>Revenez ici pour raccrocher.</div>';
