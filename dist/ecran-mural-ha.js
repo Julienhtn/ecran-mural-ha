@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.9';
+const EM_VERSION = '0.1.10';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -260,8 +260,8 @@ class EcranMuralCard extends HTMLElement {
           </div>
         </div>
         <div class="thermo-btns">
-          <button class="tbtn tbtn-cool press" data-act="temp" data-d="-0.5" aria-label="Baisser la consigne">${emIcon('minus', 26, 'currentColor', 2.4)}</button>
-          <button class="tbtn tbtn-hot press" data-act="temp" data-d="0.5" data-ref="tUp" aria-label="Augmenter la consigne">${emIcon('plus', 26, 'currentColor', 2.4)}</button>
+          <button class="tbtn tbtn-cool press" data-act="temp" data-d="-0.5" aria-label="Baisser la consigne">${emIcon('minus', 24, 'currentColor', 2.4)}</button>
+          <button class="tbtn tbtn-hot press" data-act="temp" data-d="0.5" data-ref="tUp" aria-label="Augmenter la consigne">${emIcon('plus', 24, 'currentColor', 2.4)}</button>
         </div>
       </section>
 
@@ -1315,10 +1315,10 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .dial-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:none}
 .setp{font-size:50px;font-weight:200;letter-spacing:-0.05em;line-height:1;display:flex;font-variant-numeric:tabular-nums}
 .setp .odo-s{transition:transform .7s cubic-bezier(.34,1.4,.64,1)}
-.thermo-btns{position:relative;display:flex;justify-content:center;gap:28px;margin-top:2px}
-.tbtn{width:64px;height:64px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.18),inset 0 -8px 16px rgba(0,0,0,0.18),0 14px 26px -14px rgba(0,0,0,0.9)}
-.tbtn-cool{color:#9CC2FF;background:radial-gradient(circle at 35% 28%,rgba(127,176,255,0.30),rgba(127,176,255,0.07) 70%)}
-.tbtn-hot{color:#FFD27A;background:radial-gradient(circle at 35% 28%,rgba(242,181,68,0.32),rgba(242,181,68,0.08) 70%)}
+.thermo-btns{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:2px}
+.tbtn{height:56px;border-radius:18px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.18),inset 0 -8px 16px rgba(0,0,0,0.18),0 14px 26px -14px rgba(0,0,0,0.9)}
+.tbtn-cool{color:#9CC2FF;background:linear-gradient(180deg,rgba(127,176,255,0.20),rgba(127,176,255,0.06))}
+.tbtn-hot{color:#FFD27A;background:linear-gradient(180deg,rgba(242,181,68,0.22),rgba(242,181,68,0.06))}
 .tbtn-cool:active{box-shadow:0 0 28px -4px rgba(127,176,255,0.7),inset 0 1px 0 rgba(255,255,255,0.18)}
 .tbtn-hot:active,.tbtn-warm{box-shadow:0 0 30px -4px rgba(242,181,68,0.65),inset 0 1px 0 rgba(255,255,255,0.2)}
 .tbtn-warm{border-color:rgba(242,181,68,0.5)}
