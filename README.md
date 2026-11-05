@@ -21,6 +21,7 @@ code_length: 4
 idle_timeout: 60          # secondes avant l'écran de veille (0 = jamais)
 sounds: true
 moment: auto              # auto | matin | jour | soir | nuit
+layout: auto              # auto (téléphone si largeur < 760 px) | wall | mobile
 doors:
   - { entity: binary_sensor.porte_entree_ouverture, name: Entrée }
 cameras:

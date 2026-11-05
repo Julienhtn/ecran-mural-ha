@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.32';
+const EM_VERSION = '0.2.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -410,9 +410,19 @@ class EcranMuralCard extends HTMLElement {
     this.$.ticks.setAttribute('d', d);
   }
 
+  _isMobile() {
+    const l = this._config.layout || 'auto';
+    if (l === 'mobile') return true;
+    if (l === 'wall') return false;
+    return (this.clientWidth || window.innerWidth) < 760;
+  }
+
   _fit() {
     const vp = this._viewport;
     if (!vp) return;
+    const mobile = this._isMobile();
+    if (vp.classList.contains('mobile') !== mobile) vp.classList.toggle('mobile', mobile);
+    if (mobile) { this.$.stage.style.transform = 'none'; return; }
     const w = vp.clientWidth, h = vp.clientHeight;
     if (!w || !h) return;
     const s = Math.min(w / EM_W, h / EM_H);
@@ -1369,7 +1379,7 @@ class EcranMuralCard extends HTMLElement {
   /* Veille */
   _checkIdle() {
     const timeout = Number(this._config && this._config.idle_timeout) || 0;
-    if (!timeout || !this.$ || this._state.idle) return;
+    if (!timeout || !this.$ || this._state.idle || this._isMobile()) return;
     if (this._state.pad || this._state.cam != null || !this.$.callOv.hidden) return;
     const a = this._alarmInfo();
     if (a.state === 'pending' || a.state === 'triggered') return;
@@ -1397,7 +1407,7 @@ class EcranMuralCard extends HTMLElement {
     if (this._beepState === state) return;
     this._beepState = state;
     clearTimeout(this._beepTimer);
-    if (this._config.sounds === false) return;
+    if (this._config.sounds === false || this._isMobile()) return;
     const st = this._st(this._config.alarm);
     const started = Date.now();
     const delay = st && st.attributes.delay ? Number(st.attributes.delay) * 1000 : 30000;
@@ -1677,6 +1687,54 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .idle-alarm .dot{width:8px;height:8px}
 
 .toast{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);z-index:40;padding:12px 18px;border-radius:14px;background:rgba(20,22,27,0.92);border:1px solid rgba(255,255,255,0.12);font-size:14px;animation:rise .3s ease}
+
+/* ---------- Téléphone : une colonne, défilement naturel ---------- */
+.viewport.mobile{height:auto;min-height:100vh;overflow:visible}
+.mobile .stage{position:relative;width:100%;height:auto;min-height:100vh;transform:none!important;overflow:hidden}
+.mobile .bg{position:fixed}
+.mobile .grid{display:flex;flex-direction:column;gap:12px;padding:12px 12px calc(24px + env(safe-area-inset-bottom));height:auto}
+.mobile .col{display:contents}
+.mobile .card{border-radius:22px;padding:16px}
+.mobile .clock{order:0;padding:14px 16px}
+.mobile .clock .time{font-size:56px;margin-top:6px}
+.mobile .outdoor{margin-top:6px;padding-top:6px}
+.mobile .alarm{order:1;height:auto;padding:16px;gap:16px}
+.mobile .alarm-btn{width:104px;height:104px;margin-left:0}
+.mobile .alarm-btn svg{width:34px;height:34px}
+.mobile .alarm-action{font-size:16px}
+.mobile .alarm-info h1{font-size:34px}
+.mobile .chips{margin-top:6px}
+.mobile .cams{order:2;grid-template-columns:1fr;gap:12px}
+.mobile .cam{height:auto;aspect-ratio:16/10}
+.mobile .scenes{order:3;gap:10px}
+.mobile .scene{height:96px;padding:12px;border-radius:20px}
+.mobile .scene b{font-size:14px}
+.mobile .covers{order:4}
+.mobile .cv-grid{gap:8px}
+.mobile .cv-pill{min-height:124px;border-radius:18px}
+.mobile .cv-label{font-size:12px}
+.mobile .thermo{order:5}
+.mobile .energy{order:6}
+.mobile .weather{order:7}
+.mobile .tempo{order:8}
+.mobile .halo{position:fixed}
+.mobile .overlay{position:fixed;padding:12px}
+.mobile .dialog{width:100%;height:auto;max-height:calc(100vh - 24px);overflow:auto;padding:24px 20px;border-radius:28px}
+.mobile .pad{grid-template-columns:1fr;gap:20px}
+.mobile .big{font-size:34px}
+.mobile .key{height:68px;font-size:30px}
+.mobile .keys{gap:10px}
+.mobile .arm-choices{gap:12px}
+.mobile .arm-tile{padding:20px 12px;border-radius:24px}
+.mobile .arm-ico{width:80px;height:80px}
+.mobile .arm-name{font-size:22px}
+.mobile .camfull{width:100%;height:calc(100vh - 24px);padding:0}
+.mobile .camfull-title{font-size:24px}
+.mobile .callbox{height:calc(100vh - 24px)}
+.mobile .call-grid{grid-template-columns:1fr;gap:12px}
+.mobile .call-target{padding:16px;flex-direction:row;align-items:center;gap:16px;justify-content:flex-start}
+.mobile .avatar{width:52px;height:52px;font-size:20px}
+.mobile .toast{position:fixed}
 
 @keyframes ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.32);opacity:0}}
 @keyframes breathe{0%,100%{opacity:.65}50%{opacity:1}}
