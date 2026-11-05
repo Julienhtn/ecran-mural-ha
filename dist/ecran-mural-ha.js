@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.10';
+const EM_VERSION = '0.1.12';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -12,6 +12,7 @@ const EM_H = 800;
 
 const EM_ICONS = {
   shield: '<path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"></path><path d="M9.5 12l1.8 1.8L15 10"></path>',
+  away: '<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-5h4v5"></path>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"></path>',
   video: '<rect x="3" y="6" width="12" height="12" rx="2"></rect><path d="M15 10l6-3v10l-6-3"></path>',
   thermo: '<path d="M14 14.76V4a2 2 0 1 0-4 0v10.76a4 4 0 1 0 4 0z"></path>',
@@ -280,7 +281,7 @@ class EcranMuralCard extends HTMLElement {
   <div class="halo" data-ref="halo" aria-hidden="true"></div>
 
   <div class="overlay" data-ref="padOv" hidden>
-    <div class="dialog pad" role="dialog" aria-modal="true" aria-label="Code alarme">
+    <div class="dialog pad" data-ref="padDialog" role="dialog" aria-modal="true" aria-label="Code alarme">
       <button class="xbtn press" data-act="closepad" aria-label="Fermer">${emIcon('close', 20, 'currentColor', 2)}</button>
       <div class="pad-left">
         <p class="eyebrow" data-ref="padEyebrow">Alarme</p>
@@ -294,6 +295,18 @@ class EcranMuralCard extends HTMLElement {
         <p class="pin-err" data-ref="padErr"></p>
       </div>
       <div class="keys" data-ref="keys">${keysHTML}</div>
+      <div class="arm-choices" data-ref="armChoices" hidden>
+        <button class="arm-tile arm-away press" data-act="mode" data-m="armed_away">
+          <span class="arm-ico">${emIcon('away', 56, 'currentColor', 1.6)}</span>
+          <span class="arm-name">Absent</span>
+          <span class="arm-sub">Toute la maison</span>
+        </button>
+        <button class="arm-tile arm-night press" data-act="mode" data-m="armed_night">
+          <span class="arm-ico">${emIcon('moon', 56, 'currentColor', 1.6)}</span>
+          <span class="arm-name">Nuit</span>
+          <span class="arm-sub">Périmètre seulement</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -938,13 +951,12 @@ class EcranMuralCard extends HTMLElement {
     this.$.padEyebrow.textContent = a.state === 'triggered' ? 'Alarme déclenchée' : `Alarme · ${a.label}`;
     this.$.padTitle.textContent = disarmed ? 'Armer la maison' : (a.state === 'arming' ? 'Annuler l’armement' : 'Désarmer');
     const noCode = disarmed && !this._armNeedsCode();
-    this.$.padSub.textContent = noCode ? 'Choisissez le mode : l’alarme s’arme tout de suite.' : disarmed ? 'Choisissez le mode, puis saisissez votre code.' : `Saisissez votre code à ${this._config.code_length} chiffres.`;
-    this.$.keys.style.visibility = noCode ? 'hidden' : '';
+    this.$.padSub.textContent = noCode ? 'Touchez un mode : l’alarme s’arme tout de suite.' : disarmed ? 'Choisissez le mode, puis saisissez votre code.' : `Saisissez votre code à ${this._config.code_length} chiffres.`;
+    this.$.keys.hidden = noCode;
+    this.$.armChoices.hidden = !noCode;
+    this.$.padDialog.classList.toggle('pad-nocode', noCode);
     this.$.pin.style.display = noCode ? 'none' : '';
-    this.$.padModes.classList.toggle('modes-big', noCode);
-    this.$.modeAway.textContent = noCode ? 'Armer · Absent' : 'Absent';
-    this.$.modeNight.textContent = noCode ? 'Armer · Nuit' : 'Nuit';
-    this.$.padModes.style.display = disarmed ? '' : 'none';
+    this.$.padModes.style.display = disarmed && !noCode ? '' : 'none';
     this.$.modeAway.classList.toggle('on', this._state.padMode === 'armed_away');
     this.$.modeNight.classList.toggle('on', this._state.padMode === 'armed_night');
     for (let k = 0; k < this._config.code_length; k++) this.$['dot' + k].classList.toggle('on', k < this._state.code.length);
@@ -1358,6 +1370,16 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .pin-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid #F2F1EE;transition:background .15s ease,box-shadow .3s ease}
 .pin-dot.on{background:#F2F1EE;box-shadow:0 0 14px rgba(255,255,255,0.6)}
 .pin-err{min-height:22px;font-size:15px;color:#FF8A6E}
+.pad-nocode{grid-template-columns:1fr;grid-template-rows:auto 1fr;gap:32px}.pad-nocode .pad-left{gap:10px}
+.arm-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-self:stretch}
+.arm-tile{border-radius:32px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;border:1px solid;box-shadow:inset 0 1px 0 rgba(255,255,255,0.14),0 24px 40px -24px rgba(0,0,0,0.9)}
+.arm-ico{width:112px;height:112px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.arm-name{font-size:30px;font-weight:400;letter-spacing:-0.02em;color:#F2F1EE}
+.arm-sub{font-size:15px;color:#A3A6AD}
+.arm-away{color:#FF8A6E;border-color:rgba(255,107,74,0.35);background:linear-gradient(180deg,rgba(255,107,74,0.16),rgba(255,107,74,0.04))}
+.arm-away .arm-ico{background:radial-gradient(circle,rgba(255,107,74,0.28),rgba(255,107,74,0.06) 70%);box-shadow:0 0 50px -10px rgba(255,107,74,0.6)}
+.arm-night{color:#A9B5FF;border-color:rgba(139,156,255,0.35);background:linear-gradient(180deg,rgba(139,156,255,0.16),rgba(139,156,255,0.04))}
+.arm-night .arm-ico{background:radial-gradient(circle,rgba(139,156,255,0.28),rgba(139,156,255,0.06) 70%);box-shadow:0 0 50px -10px rgba(139,156,255,0.6)}
 .keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-content:center}
 .key{height:104px;border-radius:52px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.06);font-size:38px;font-weight:200;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);font-variant-numeric:tabular-nums}
 .key-ghost{background:transparent}.key-small{font-size:17px;font-weight:400}
