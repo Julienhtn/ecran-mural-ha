@@ -4,13 +4,14 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.3.1';
+const EM_VERSION = '0.4.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
 const EM_H = 800;
 
 const EM_ICONS = {
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path><path d="M12 15v2.5"></path>',
   shield: '<path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"></path><path d="M9.5 12l1.8 1.8L15 10"></path>',
   away: '<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-5h4v5"></path>',
   pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"></path>',
@@ -414,6 +415,15 @@ class EcranMuralCard extends HTMLElement {
     </span>
   </button>
 
+  <div class="intrusion" data-ref="intrOv" hidden role="alertdialog" aria-label="Alerte intrusion">
+    <div class="intr-flash" aria-hidden="true"></div>
+    <div class="intr-in">
+      <p class="intr-title">ALERTE INTRUSION</p>
+      <p class="intr-sub" data-ref="intrSub">Agent en route</p>
+      <button class="intr-lock press" data-act="intrpad" aria-label="Afficher le clavier pour désarmer">${emIcon('lock', 64, 'currentColor', 1.6)}<span>Désarmer</span></button>
+    </div>
+  </div>
+
   <div class="toast" data-ref="toast" hidden></div>
  </div>
 </div>`;
@@ -600,7 +610,12 @@ class EcranMuralCard extends HTMLElement {
     this.$.idleDot.style.background = a.border;
     this.$.idleDot.style.boxShadow = `0 0 10px ${a.border}`;
     if (a.state === 'pending' && this._prevAlarm !== 'pending') { this._wake(); this._openPad(); }
-    if (a.state === 'triggered' && this._prevAlarm !== 'triggered') { this._wake(); this._openPad(); }
+    if (a.state === 'triggered' && this._prevAlarm !== 'triggered') {
+      this._wake();
+      if (this._isMobile()) this._openPad();
+      else { this._closePad(); this.$.intrOv.hidden = false; }
+    }
+    if (a.state !== 'triggered' && !this.$.intrOv.hidden) this.$.intrOv.hidden = true;
     if (this._prevAlarm && this._prevAlarm !== a.state && this._state.pad && a.state === 'disarmed' && this._prevAlarm !== 'disarmed') this._closePad();
     this._beepFor(a.state);
     this._prevAlarm = a.state;
@@ -1074,6 +1089,7 @@ class EcranMuralCard extends HTMLElement {
     const i = el.dataset.i;
     switch (act) {
       case 'pad': this._openPad(); break;
+      case 'intrpad': this.$.intrOv.hidden = true; this._openPad(); break;
       case 'tab': this._setTab(el.dataset.t); break;
       case 'secmode': this._secMode(el.dataset.m); break;
       case 'camlight': this._call('light', 'toggle', { entity_id: el.dataset.e }); break;
@@ -1130,6 +1146,8 @@ class EcranMuralCard extends HTMLElement {
     this._state.pad = false;
     this._state.code = '';
     this.$.padOv.hidden = true;
+    // Alarme toujours déclenchée : on revient sur le bandeau d'intrusion.
+    if (this.$.intrOv && !this._isMobile() && this._alarmInfo().state === 'triggered') this.$.intrOv.hidden = false;
   }
 
   _armNeedsCode() {
@@ -2013,6 +2031,16 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .tabbar button{flex:1;max-width:130px;border:0;background:transparent;color:#8A8E97;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:14px;font-size:11px;font-weight:500;transition:color .25s ease,background .25s ease}
 .tabbar button.on{color:#F2F1EE;background:rgba(255,255,255,0.07)}
 .tabbar button.on svg{color:var(--accent)}
+
+/* ---------- Intrusion (écran mural) ---------- */
+.intrusion{position:absolute;inset:0;z-index:28;display:flex;align-items:center;justify-content:center;background:#1A0304;overflow:hidden}
+.intr-flash{position:absolute;inset:0;background:radial-gradient(ellipse at center,#E5484D 0%,#8E0F14 55%,#2A0406 100%);animation:intrBlink 1s steps(1,end) infinite}
+.intr-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.intr-title{font-size:120px;font-weight:700;letter-spacing:-0.03em;line-height:.95;color:#FFFFFF;text-shadow:0 8px 60px rgba(0,0,0,.45)}
+.intr-sub{font-size:40px;font-weight:400;color:#FFE1E1;letter-spacing:.01em}
+.intr-lock{margin-top:36px;width:200px;height:200px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(0,0,0,0.28);color:#FFFFFF;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-size:20px;font-weight:600;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 0 0 0 rgba(255,255,255,.5);animation:intrPulse 1.6s ease-out infinite}
+@keyframes intrBlink{0%{opacity:1}50%{opacity:.25}}
+@keyframes intrPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.45)}100%{box-shadow:0 0 0 40px rgba(255,255,255,0)}}
 
 @keyframes ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.32);opacity:0}}
 @keyframes breathe{0%,100%{opacity:.65}50%{opacity:1}}
