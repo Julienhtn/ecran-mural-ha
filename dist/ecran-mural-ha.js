@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.1.31';
+const EM_VERSION = '0.1.32';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1236,7 +1236,8 @@ class EcranMuralCard extends HTMLElement {
     const media = this.$.camMedia;
     media.innerHTML = '';
     if (s && s.state !== 'unavailable') {
-      if (customElements.get('ha-camera-stream') && cam.live !== false) {
+      // Direct vidéo seulement si la caméra le permet (la sonnette Netatmo n'a qu'une image fixe).
+      if (customElements.get('ha-camera-stream') && cam.live !== false && (s.attributes.supported_features & 2)) {
         const st = document.createElement('ha-camera-stream');
         st.hass = this._hass;
         st.stateObj = s;
@@ -1245,10 +1246,18 @@ class EcranMuralCard extends HTMLElement {
         st.className = 'stream';
         media.appendChild(st);
       } else {
-        const img = document.createElement('img');
-        img.src = `${s.attributes.entity_picture}&_=${Date.now()}`;
-        img.className = 'stream';
-        media.appendChild(img);
+        // Image entière (toute la hauteur), fond flouté de la même image pour remplir les côtés.
+        const url = `${s.attributes.entity_picture}${s.attributes.entity_picture.includes('?') ? '&' : '?'}_=${Date.now()}`;
+        media.innerHTML = `<div class="camfull-blur" style="background-image:url('${url}')"></div><img class="stream still" src="${url}" alt="">`;
+        clearInterval(this._fullCamTimer);
+        this._fullCamTimer = setInterval(() => {
+          const im = media.querySelector('img.still');
+          if (!im || this.$.camOv.hidden) { clearInterval(this._fullCamTimer); return; }
+          const u2 = `${s.attributes.entity_picture}${s.attributes.entity_picture.includes('?') ? '&' : '?'}_=${Date.now()}`;
+          const pre = new Image();
+          pre.onload = () => { im.src = u2; const b = media.querySelector('.camfull-blur'); if (b) b.style.backgroundImage = `url('${u2}')`; };
+          pre.src = u2;
+        }, 3000);
       }
     } else {
       media.innerHTML = `<span class="cam-empty big-empty">${emIcon('video', 64, 'rgba(255,255,255,0.16)', 1.3)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>`;
@@ -1258,6 +1267,7 @@ class EcranMuralCard extends HTMLElement {
   }
 
   _closeCam() {
+    clearInterval(this._fullCamTimer);
     this._state.cam = null;
     this.$.camMedia.innerHTML = '';
     this.$.camOv.hidden = true;
@@ -1633,7 +1643,8 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 
 .camfull{width:1232px;height:752px;padding:0;overflow:hidden;background:#07090C;border-radius:32px;animation:grow .55s cubic-bezier(.2,.9,.25,1.05)}
 .camfull-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-.camfull-media .stream{width:100%;height:100%;object-fit:contain;display:block}
+.camfull-media .stream{position:relative;width:100%;height:100%;object-fit:contain;display:block;--video-max-height:100%}
+.camfull-blur{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(40px) brightness(.45);transform:scale(1.1)}
 .big-empty{font-size:15px}
 .camfull-head{position:absolute;left:28px;top:24px;display:flex;flex-direction:column;gap:6px;text-shadow:0 1px 8px rgba(0,0,0,.8)}
 .camfull-title{font-size:36px;font-weight:300;letter-spacing:-0.03em}
