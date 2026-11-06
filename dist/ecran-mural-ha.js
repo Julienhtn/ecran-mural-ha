@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.4.0';
+const EM_VERSION = '0.4.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -230,7 +230,7 @@ class EcranMuralCard extends HTMLElement {
       <section class="card weather">
         <div class="row-between"><h2 data-ref="wTitle">Aujourd’hui</h2><p class="small"><span class="warm" data-ref="wmax"></span>  <span class="cool" data-ref="wmin"></span></p></div>
         <div class="wicons" data-ref="wicons" aria-hidden="true"></div>
-        <svg viewBox="0 0 248 108" width="100%" height="108" data-ref="wchart" role="img" aria-label="Température heure par heure"></svg>
+        <svg viewBox="0 0 248 108" width="100%" height="108" style="overflow:visible;display:block" data-ref="wchart" role="img" aria-label="Température heure par heure"></svg>
         <div class="row-between"><h3>Précipitations</h3><p class="small cool" data-ref="rainTotal"></p></div>
         <div class="rain" data-ref="rain" role="img" aria-label="Précipitations heure par heure"></div>
         <div class="axis" data-ref="axis"></div>
@@ -477,6 +477,7 @@ class EcranMuralCard extends HTMLElement {
     if (!vp) return;
     const mobile = this._isMobile();
     if (vp.classList.contains('mobile') !== mobile) vp.classList.toggle('mobile', mobile);
+    if (this.$.wchart && this._forecast && Math.round(this.$.wchart.clientWidth) !== this._wW) this._renderWeather();
     if (mobile) { this.$.stage.style.transform = 'none'; return; }
     const w = vp.clientWidth, h = vp.clientHeight;
     if (!w || !h) return;
@@ -878,7 +879,12 @@ class EcranMuralCard extends HTMLElement {
     const temps = known.map((x) => x.temp).concat(isToday && curT != null ? [curT] : []);
     const tmin = Math.min(...temps), tmax = Math.max(...temps);
     const span = Math.max(1, tmax - tmin);
-    const x0 = 10, x1 = 238, yT = 22, yB = 86, n = slots.length - 1;
+    // Largeur réelle du graphique : 6h collé à gauche, minuit collé à droite, comme les précipitations.
+    const W = Math.max(160, Math.round(svg.clientWidth || 248));
+    if (svg.getAttribute('viewBox') !== `0 0 ${W} 108`) svg.setAttribute('viewBox', `0 0 ${W} 108`);
+    this._wW = W;
+    const x0 = 0, x1 = W, yT = 22, yB = 86, n = slots.length - 1;
+    const LX = (x) => Math.min(W - 10, Math.max(10, x));
     const X = (i) => x0 + i * (x1 - x0) / n;
     const Y = (v) => yT + (tmax - v) / span * (yB - yT);
     const idx = slots.map((x, i) => (x.temp != null ? i : -1)).filter((i) => i >= 0);
@@ -897,9 +903,9 @@ class EcranMuralCard extends HTMLElement {
       ${nowX != null ? `<line x1="${nowX.toFixed(1)}" x2="${nowX.toFixed(1)}" y1="14" y2="96" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="2 3"></line>` : ''}
       ${nowPt ? `<circle cx="${nowPt[0].toFixed(1)}" cy="${nowPt[1].toFixed(1)}" r="8" fill="rgba(255,255,255,0.18)"></circle><circle cx="${nowPt[0].toFixed(1)}" cy="${nowPt[1].toFixed(1)}" r="4.5" fill="#F2F1EE"></circle>` : ''}
       <circle cx="${X(iMax).toFixed(1)}" cy="${Y(tmax).toFixed(1)}" r="4.5" fill="#F2B544"></circle>
-      <text x="${X(iMax).toFixed(1)}" y="${(Y(tmax) - 9).toFixed(1)}" fill="#F2B544" class="svgt" text-anchor="middle">${emFr(tmax, 0)}°</text>
+      <text x="${LX(X(iMax)).toFixed(1)}" y="${(Y(tmax) - 9).toFixed(1)}" fill="#F2B544" class="svgt" text-anchor="middle">${emFr(tmax, 0)}°</text>
       <circle cx="${X(iMin).toFixed(1)}" cy="${Y(tmin).toFixed(1)}" r="4.5" fill="#7FB0FF"></circle>
-      <text x="${X(iMin).toFixed(1)}" y="${(Y(tmin) + 18).toFixed(1)}" fill="#7FB0FF" class="svgt" text-anchor="middle">${emFr(tmin, 0)}°</text>`;
+      <text x="${LX(X(iMin)).toFixed(1)}" y="${(Y(tmin) + 18).toFixed(1)}" fill="#7FB0FF" class="svgt" text-anchor="middle">${emFr(tmin, 0)}°</text>`;
     svg.setAttribute('aria-label', `Température de 6 heures à minuit, maximum ${emFr(tmax, 0)} degrés, minimum ${emFr(tmin, 0)} degrés`);
     this.$.wmax.textContent = `↑ ${emFr(tmax, 0)}°`;
     this.$.wmin.textContent = `↓ ${emFr(tmin, 0)}°`;
@@ -913,7 +919,7 @@ class EcranMuralCard extends HTMLElement {
     const tot = bars.reduce((a, x) => a + (x.rain || 0), 0);
     this.$.rainTotal.textContent = `${emFr(tot, 1)} mm`;
     this.$.axis.innerHTML = ['6h', '12h', '18h', '24h'].map((l) => `<span>${l}</span>`).join('');
-    this.$.wicons.innerHTML = slots.map((x, i) => (x.h % 2 === 0 && x.h < 24 && x.cond ? `<span style="left:${(X(i) / 248 * 100).toFixed(2)}%;opacity:${x.past ? 0.45 : 1}" title="${x.h}h">${emWeatherIcon(x.cond, x.h)}</span>` : '')).join('');
+    this.$.wicons.innerHTML = slots.map((x, i) => (x.h % 2 === 0 && x.h < 24 && x.cond ? `<span style="left:${(X(i) / W * 100).toFixed(2)}%;opacity:${x.past ? 0.45 : 1}" title="${x.h}h">${emWeatherIcon(x.cond, x.h)}</span>` : '')).join('');
   }
 
   async _statChange(id, period) {
