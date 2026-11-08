@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.4.1';
+const EM_VERSION = '0.5.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -508,9 +508,13 @@ class EcranMuralCard extends HTMLElement {
         const un = await conn.subscribeEvents((ev) => {
           const d = (ev.data && ev.data.data) || {};
           const push = String(d.push_type || ev.data.push_type || '');
-          if (/NDB/i.test(push) && /incoming_call|rtc/i.test(push + (d.type || ''))) this._openCam(this._camIndex(c.doorbell_camera), true);
+          if (/NDB/i.test(push) && /incoming_call|rtc/i.test(push + (d.type || ''))) this._doorbell();
         }, 'netatmo_event');
         this._unsubs.push(un);
+        const un2 = await conn.subscribeEvents(() => this._doorbell(), 'ecran_mural_sonnette');
+        this._unsubs.push(un2);
+        const un3 = await conn.subscribeEvents((ev) => this._showVisitor((ev.data && ev.data.texte) || ''), 'ecran_mural_visage');
+        this._unsubs.push(un3);
       } catch (e) { /* netatmo absent */ }
     }
     try {
@@ -1308,6 +1312,36 @@ class EcranMuralCard extends HTMLElement {
     }, 900);
   }
 
+  /* Sonnette : ouvre la caméra en grand, fait sonner l'écran, affiche qui est là. */
+  _doorbell() {
+    const now = Date.now();
+    if (this._lastRing && now - this._lastRing < 20000) return;
+    this._lastRing = now;
+    this._visitor = '';
+    this._openCam(this._camIndex(this._config.doorbell_camera), true);
+    this._ringDing();
+  }
+
+  _ringDing() {
+    clearTimeout(this._dingTimer);
+    if (this._config.sounds === false || this._isMobile()) return;
+    let n = 0;
+    const loop = () => {
+      if (!this.$ || this.$.camOv.hidden || !this.$.camRing || this.$.camRing.hidden) return;
+      this._tone([659.25], 0.55, 0, 'sine', 0.32);
+      setTimeout(() => this._tone([523.25], 0.9, 0, 'sine', 0.3), 480);
+      if (++n < 4) this._dingTimer = setTimeout(loop, 4000);
+    };
+    loop();
+  }
+
+  _showVisitor(texte) {
+    if (!texte || !this.$ || this.$.camOv.hidden) return;
+    this._visitor = texte;
+    const known = !/inconnu|non visible|sonne/i.test(texte);
+    this.$.camSub.innerHTML = `<span class="visitor ${known ? 'known' : ''}">${known ? '🙂 ' : ''}${emEsc(texte)}</span>`;
+  }
+
   /* Caméras */
   _openCam(i, ringing) {
     const cam = (this._config.cameras || [])[i];
@@ -1315,7 +1349,7 @@ class EcranMuralCard extends HTMLElement {
     const s = this._st(cam.entity);
     this._state.cam = i;
     this.$.camTitle.textContent = cam.name || '';
-    this.$.camSub.textContent = cam.sub || '';
+    this.$.camSub.textContent = ringing ? 'Analyse du visiteur…' : (cam.sub || '');
     this.$.camRing.hidden = !ringing;
     const media = this.$.camMedia;
     media.innerHTML = '';
@@ -1341,17 +1375,18 @@ class EcranMuralCard extends HTMLElement {
           const pre = new Image();
           pre.onload = () => { im.src = u2; const b = media.querySelector('.camfull-blur'); if (b) b.style.backgroundImage = `url('${u2}')`; };
           pre.src = u2;
-        }, 3000);
+        }, ringing ? 1000 : 3000);
       }
     } else {
       media.innerHTML = `<span class="cam-empty big-empty">${emIcon('video', 64, 'rgba(255,255,255,0.16)', 1.3)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>`;
     }
-    if (ringing) { this._wake(); this._chime('arm'); }
+    if (ringing) this._wake();
     this.$.camOv.hidden = false;
   }
 
   _closeCam() {
     clearInterval(this._fullCamTimer);
+    clearTimeout(this._dingTimer);
     this._state.cam = null;
     this.$.camMedia.innerHTML = '';
     this.$.camOv.hidden = true;
@@ -1797,6 +1832,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .cams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .cam{position:relative;height:166px;border-radius:24px;overflow:hidden;padding:0;text-align:left;background:rgba(8,10,14,0.55);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
 .cam img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.visitor{display:inline-block;margin-top:6px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.1);color:#F2F1EE;font-weight:600;font-size:18px}.visitor.known{background:rgba(91,201,138,.22);color:#BFF0D2}
 .cam-live{position:absolute;inset:0}.cam-live .stream{width:100%;height:100%;display:block;object-fit:cover;--video-max-height:100%}
 .cam-empty{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;color:#8A8E97}
 .cam-tag{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
