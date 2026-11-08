@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.0';
+const EM_VERSION = '0.5.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -2104,4 +2104,121 @@ if (!customElements.get('ecran-mural-card')) {
   window.customCards = window.customCards || [];
   window.customCards.push({ type: 'ecran-mural-card', name: 'Écran mural', description: 'Tableau de bord mural plein écran : alarme, caméras, scènes, volets, thermostat, météo, énergie.', preview: false });
   console.info(`%c ÉCRAN MURAL %c v${EM_VERSION} `, 'background:#F2B544;color:#1A1305;font-weight:700;border-radius:4px 0 0 4px;padding:2px 6px', 'background:#16181B;color:#F2F1EE;border-radius:0 4px 4px 0;padding:2px 6px');
+}
+
+/* Carte « Visages » : nommer les visages inconnus vus par la sonnette (passe par Home Assistant, marche en https). */
+class VisagesCard extends HTMLElement {
+  setConfig(config) { this._config = config || {}; }
+  getCardSize() { return 8; }
+  set hass(hass) {
+    const first = !this._hass;
+    this._hass = hass;
+    if (first) { this._build(); this._load(); }
+  }
+
+  async _rest(service, data) {
+    const r = await this._hass.callWS({
+      type: 'execute_script',
+      sequence: [
+        { action: 'rest_command.' + service, data: data || {}, response_variable: 'r' },
+        { stop: 'ok', response_variable: 'r' },
+      ],
+    });
+    const res = r && r.response;
+    if (!res || res.status !== 200) throw new Error('Service visages injoignable');
+    return res.content;
+  }
+
+  _build() {
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot.innerHTML = `<style>${VISAGES_CSS}</style>
+      <div class="wrap">
+        <div class="head"><div><h1>Visages</h1><p class="sub">Donne un prénom à un visage : la sonnette le reconnaîtra la prochaine fois. 5 à 10 photos par personne, sous des angles et des éclairages différents, donnent les meilleurs résultats.</p></div>
+        <button class="ghost" data-act="reload">Actualiser</button></div>
+        <datalist id="noms"></datalist>
+        <h2 data-ref="titreInc">À identifier</h2><div data-ref="inc" class="grid"><div class="vide">Chargement…</div></div>
+        <h2>Personnes connues</h2><div data-ref="pers" class="pers"></div>
+      </div>`;
+    this.shadowRoot.addEventListener('click', (e) => this._click(e));
+    this.shadowRoot.addEventListener('submit', (e) => { e.preventDefault(); this._nommer(e.target); });
+  }
+
+  $(ref) { return this.shadowRoot.querySelector(`[data-ref="${ref}"]`); }
+
+  async _load() {
+    try {
+      const d = await this._rest('visages_liste');
+      this._render(d);
+    } catch (e) {
+      this.$('inc').innerHTML = `<div class="vide">${emEsc(e.message || 'Erreur')}</div>`;
+    }
+  }
+
+  _render(d) {
+    const noms = (d.personnes || []).map((p) => p.nom);
+    this.shadowRoot.getElementById('noms').innerHTML = noms.map((n) => `<option value="${emEsc(n)}">`).join('');
+    this.$('titreInc').textContent = `À identifier (${d.total_inconnus || 0})`;
+    const inc = d.inconnus || [];
+    this.$('inc').innerHTML = inc.length ? inc.map((v) => `
+      <div class="c" data-f="${emEsc(v.fichier)}">
+        <img src="data:image/jpeg;base64,${v.img}" alt="">
+        <div class="b">
+          <div class="meta">${emEsc(v.date)} · ${emEsc(v.camera)}</div>
+          ${v.suggestion ? `<div class="sug">Ressemble à ${emEsc(v.suggestion)} (${Math.round(v.score * 100)} %)</div>` : ''}
+          <form class="row" data-f="${emEsc(v.fichier)}"><input name="nom" list="noms" placeholder="Prénom" value="${emEsc(v.suggestion || '')}" autocomplete="off"><button>OK</button></form>
+          <button class="ghost" data-act="suppr" data-f="${emEsc(v.fichier)}">Ignorer</button>
+        </div>
+      </div>`).join('') : '<div class="vide">Aucun visage inconnu pour l’instant.</div>';
+    const pers = d.personnes || [];
+    this.$('pers').innerHTML = pers.length ? pers.map((p) => `
+      <div class="p"><h3>${emEsc(p.nom)} <span>${p.total} photo${p.total > 1 ? 's' : ''}</span></h3>
+        <div class="th">${p.photos.map((x) => `<div><img src="data:image/jpeg;base64,${x.img}" alt=""><button data-act="suppr" data-f="${emEsc(x.fichier)}" aria-label="Supprimer">✕</button></div>`).join('')}</div>
+      </div>`).join('') : '<div class="vide">Personne n’est encore enregistré.</div>';
+  }
+
+  async _nommer(form) {
+    const nom = (form.nom.value || '').trim();
+    if (!nom) return;
+    form.querySelector('button').disabled = true;
+    try {
+      const r = await this._rest('visages_nommer', { fichier: form.dataset.f, nom });
+      if (!r.ok) throw new Error(r.erreur || 'Erreur');
+      this._load();
+    } catch (e) { form.querySelector('button').disabled = false; alert(e.message); }
+  }
+
+  async _click(e) {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    if (b.dataset.act === 'reload') this._load();
+    if (b.dataset.act === 'suppr') {
+      b.disabled = true;
+      try { await this._rest('visages_supprimer', { fichier: b.dataset.f }); this._load(); } catch (err) { b.disabled = false; }
+    }
+  }
+}
+
+const VISAGES_CSS = `
+:host{display:block;--bg:#0B0C0E;--card:#15171B;--line:#24272E;--txt:#F2F1EE;--mut:#8D919A;--acc:#F2B544}
+.wrap{background:var(--bg);color:var(--txt);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:24px max(16px,3vw) 48px;min-height:100%;box-sizing:border-box}
+*{box-sizing:border-box}.head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+h1{font-size:26px;margin:0 0 4px;font-weight:600}h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:30px 0 14px;font-weight:600}
+.sub{color:var(--mut);margin:0;max-width:720px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.c img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}.b{padding:10px;display:flex;flex-direction:column;gap:8px}
+.meta{font-size:12px;color:var(--mut)}.sug{font-size:12px;color:var(--acc)}.row{display:flex;gap:6px}
+input{flex:1;min-width:0;background:#0F1013;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 10px;font:inherit}
+button{border:0;border-radius:10px;padding:8px 11px;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:#1A1407}
+button.ghost{background:#24272E;color:var(--mut)}button:disabled{opacity:.5}
+.pers{display:flex;flex-wrap:wrap;gap:14px}.p{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;min-width:220px;flex:1}
+.p h3{margin:0 0 10px;font-size:17px}.p h3 span{color:var(--mut);font-weight:400;font-size:13px}
+.th{display:flex;flex-wrap:wrap;gap:8px}.th div{position:relative}.th img{width:64px;height:64px;object-fit:cover;border-radius:10px;display:block}
+.th button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;padding:0;border-radius:50%;font-size:12px;line-height:22px;background:#2E3139;color:var(--txt)}
+.vide{color:var(--mut);padding:20px;border:1px dashed var(--line);border-radius:16px;text-align:center;grid-column:1/-1}
+`;
+
+if (!customElements.get('visages-card')) {
+  customElements.define('visages-card', VisagesCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({ type: 'visages-card', name: 'Visages', description: 'Nommer les visages vus par la sonnette.', preview: false });
 }

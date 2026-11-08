@@ -308,6 +308,36 @@ def supprimer(fichier):
     return {'ok': True}
 
 
+# ---------- Liste pour la carte Home Assistant (vignettes en base64) ----------
+
+def vignette(chemin, taille=180):
+    img = cv2.imread(chemin)
+    if img is None:
+        return ''
+    h, w = img.shape[:2]
+    c = min(h, w)
+    img = img[(h - c) // 2:(h - c) // 2 + c, (w - c) // 2:(w - c) // 2 + c]
+    img = cv2.resize(img, (taille, taille), interpolation=cv2.INTER_AREA)
+    ok, jpg = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 72])
+    import base64
+    return base64.b64encode(jpg.tobytes()).decode() if ok else ''
+
+
+def liste(maxi=60):
+    inc = []
+    for f in sorted(inconnus, reverse=True)[:maxi]:
+        nom, score = meilleur(inconnus[f][0])
+        inc.append({'fichier': f, 'date': date_lisible(f), 'camera': f.split('-')[2] if f.count('-') >= 3 else '',
+                    'suggestion': joli(nom) if nom and score >= SUGGESTION else '',
+                    'score': round(score, 2), 'img': vignette(os.path.join(DOSSIER_I, f))})
+    pers = []
+    for n in sorted(connus) + [x for x in sorted(os.listdir(DOSSIER_P)) if x not in connus and os.path.isdir(os.path.join(DOSSIER_P, x))]:
+        fs = sorted(glob.glob(os.path.join(DOSSIER_P, n, '*.jpg')), reverse=True)
+        pers.append({'nom': joli(n), 'id': n, 'total': len(fs),
+                     'photos': [{'fichier': n + '/' + os.path.basename(x), 'img': vignette(x, 120)} for x in fs[:12]]})
+    return {'inconnus': inc, 'total_inconnus': len(inconnus), 'personnes': pers}
+
+
 # ---------- Galerie ----------
 
 STYLE = """
@@ -431,6 +461,8 @@ class Gestion(BaseHTTPRequestHandler):
         m = re.fullmatch(r'/c/([A-Za-z0-9_.-]+\.jpg)', p)
         if m:
             return self._fichier(os.path.join(DOSSIER_C, m.group(1)))
+        if p == '/liste':
+            return self._rep(200, liste())
         if p == '/derniere.jpg':
             return self._rep(200, corps=derniere, type_='image/jpeg') if derniere else self._rep(404, {'erreur': 'aucune'})
         if p == '/visage.jpg':
