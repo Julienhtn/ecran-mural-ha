@@ -11,7 +11,7 @@ done
 if [ -f /etc/apt/sources.list ] && grep -q '^deb .*debian' /etc/apt/sources.list && ! grep -q non-free-firmware /etc/apt/sources.list; then
   sed -i '/^deb .*debian/ s/$/ non-free-firmware/' /etc/apt/sources.list
 fi
-apt-get update -qq
+apt-get update -qq || true
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq intel-microcode >/dev/null
 
 # 2. Limiter les états de veille profonde du processeur (gels connus du N5105)
