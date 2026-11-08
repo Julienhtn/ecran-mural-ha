@@ -157,6 +157,19 @@ def photo_camera(camera):
     return reduire(img)
 
 
+def photo_url(url):
+    """Photo d'un événement Netatmo (instantané ou vignette), adresse signée *.netatmo.net uniquement."""
+    hote = urlparse(url).hostname or ''
+    if urlparse(url).scheme != 'https' or not (hote == 'netatmo.net' or hote.endswith('.netatmo.net') or hote.endswith('.netatmo.com')):
+        raise ValueError('adresse refusée')
+    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'visages'}), timeout=10) as r:
+        data = r.read()
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError('image illisible')
+    return img
+
+
 def nettoyer(dossier, garder):
     for f in sorted(glob.glob(os.path.join(dossier, '*.jpg')))[:-garder]:
         try:
@@ -182,13 +195,25 @@ def garder_inconnu(img, face, emb, camera):
     return nom
 
 
-def analyser(camera, image=None):
-    """Prend plusieurs photos et garde la meilleure reconnaissance."""
+def analyser(camera, image=None, urls=None):
+    """Prend plusieurs photos (ou celles de l'événement) et garde la meilleure reconnaissance."""
     global derniere
     t0 = time.time()
     essais = []
-    for i in range(1 if image is not None else TENTATIVES):
-        img = image if image is not None else photo_camera(camera)
+    sources = []
+    for u in (urls or []):
+        try:
+            im = photo_url(u)
+            # Vignette Netatmo souvent petite : on l'agrandit pour que le visage soit détectable.
+            if max(im.shape[:2]) < 640:
+                f = 640 / max(im.shape[:2])
+                im = cv2.resize(im, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
+            sources.append(reduire(im))
+        except Exception:  # noqa
+            pass
+    n = len(sources) if sources else (1 if image is not None else TENTATIVES)
+    for i in range(n):
+        img = sources[i] if sources else (image if image is not None else photo_camera(camera))
         res = []
         for f in visages(img):
             if f[2] < TAILLE_MIN:
@@ -200,7 +225,7 @@ def analyser(camera, image=None):
         essais.append((img, res))
         if any(r['nom'] for r in res):
             break
-        if i < TENTATIVES - 1 and image is None:
+        if not sources and i < TENTATIVES - 1 and image is None:
             time.sleep(0.6)
     img, res = max(essais, key=lambda e: (sum(1 for r in e[1] if r['nom']), len(e[1]),
                                           max([r['score'] for r in e[1]] or [-1])))
@@ -424,7 +449,8 @@ class Gestion(BaseHTTPRequestHandler):
                 img = None
                 if '_image' in d:
                     img = reduire(cv2.imdecode(np.frombuffer(d['_image'], np.uint8), cv2.IMREAD_COLOR))
-                return self._rep(200, analyser(d.get('camera') or CAMERA, img))
+                urls = [u for u in (d.get('urls') or []) if isinstance(u, str) and u.startswith('https://')]
+                return self._rep(200, analyser(d.get('camera') or CAMERA, img, urls))
             if p == '/apprendre':
                 if not d.get('nom'):
                     return self._rep(400, {'erreur': 'nom manquant'})
