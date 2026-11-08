@@ -6,6 +6,8 @@ set -euo pipefail
 CTID=${1:-110}; IP=${2:-192.168.86.12/24}; GW=${3:-192.168.86.1}; HA=${4:-http://192.168.86.11}; TOKEN=${5:-}
 DEPOT=https://raw.githubusercontent.com/Julienhtn/ecran-mural-ha/main/visages
 
+if [ -z "$TOKEN" ]; then read -rsp "Colle le jeton Home Assistant puis Entrée : " TOKEN </dev/tty; echo; fi
+[ ${#TOKEN} -gt 100 ] || { echo "Jeton manquant ou incomplet"; exit 1; }
 if pct status "$CTID" >/dev/null 2>&1; then echo "Le conteneur $CTID existe déjà"; exit 1; fi
 if ping -c1 -W1 "${IP%/*}" >/dev/null 2>&1; then echo "L'adresse ${IP%/*} est déjà utilisée"; exit 1; fi
 
