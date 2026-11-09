@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.11';
+const EM_VERSION = '0.5.12';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -166,13 +166,25 @@ class EcranMuralCard extends HTMLElement {
     this._clock = setInterval(() => this._tickClock(), 5000);
     this._idleTimer = setInterval(() => this._checkIdle(), 3000);
     this._camTimer = setInterval(() => this._refreshCams(), 10000);
+    // Battement de cœur de la tablette : si la page se fige, Home Assistant redémarre le navigateur.
+    clearInterval(this._hbTimer);
+    this._hbTimer = setInterval(() => this._heartbeat(), 60000);
+    setTimeout(() => this._heartbeat(), 5000);
     this._onDown = () => { this._last = Date.now(); };
     window.addEventListener('pointerdown', this._onDown, true);
     if (this._ro && this._viewport) this._ro.observe(this._viewport);
     if (this._hass && this._built) this._initAsync();
   }
 
+  _heartbeat() {
+    const ent = this._config && (this._config.heartbeat_entity || 'input_datetime.tablette_heartbeat');
+    const h = this._hass;
+    if (!h || !h.user || !/tablette/i.test(h.user.name || '') || !h.states[ent]) return;
+    h.callService('input_datetime', 'set_datetime', { entity_id: ent, timestamp: Math.floor(Date.now() / 1000) }).catch(() => {});
+  }
+
   disconnectedCallback() {
+    clearInterval(this._hbTimer);
     clearInterval(this._clock);
     clearInterval(this._idleTimer);
     clearInterval(this._camTimer);
