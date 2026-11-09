@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.9';
+const EM_VERSION = '0.5.10';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1463,7 +1463,7 @@ class EcranMuralCard extends HTMLElement {
     // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
     const isVdo = /vdo\.ninja/.test(call.room);
     // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
-    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user' : 'videodevice=1&facingmode=user&cleanoutput'}&label=${encodeURIComponent(name)}`;
+    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user&width=1280&height=720&fps=24' : 'videodevice=1&facingmode=user&cleanoutput&codec=h264&width=640&height=480&fps=20'}&label=${encodeURIComponent(name)}`;
     const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
