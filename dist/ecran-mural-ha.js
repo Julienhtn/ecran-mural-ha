@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.6';
+const EM_VERSION = '0.5.7';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -106,7 +106,25 @@ class EcranMuralCard extends HTMLElement {
     if (!this._config) return;
     if (!this._built) this._build();
     this._update();
+    this._checkSignal();
     if (first) this._initAsync();
+  }
+
+  /* Signal par entité (input_text) : marche aussi pour un utilisateur non administrateur,
+     qui n'a pas le droit d'écouter les événements personnalisés. Format « type|horodatage|texte ». */
+  _checkSignal() {
+    const ent = this._config.signal_entity || 'input_text.ecran_mural_signal';
+    const s = this._hass && this._hass.states[ent];
+    if (!s || s.state === this._lastSignal) return;
+    const firstSeen = this._lastSignal === undefined;
+    this._lastSignal = s.state;
+    if (firstSeen) return;
+    const [type, ts, ...rest] = String(s.state).split('|');
+    if (!ts || Math.abs(Date.now() / 1000 - Number(ts)) > 90) return;
+    const texte = rest.join('|');
+    if (type === 'sonnette' && this._config.doorbell_camera) this._doorbell();
+    else if (type === 'visage') this._showVisitor(texte);
+    else if (type === 'decroche') { this._ringing = false; clearTimeout(this._ringTimer); if (this.$ && this.$.callText && !this.$.callOv.hidden) this.$.callText.textContent = 'En ligne'; }
   }
 
   get hass() { return this._hass; }
