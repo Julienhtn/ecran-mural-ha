@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.14';
+const EM_VERSION = '0.5.15';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1466,7 +1466,18 @@ class EcranMuralCard extends HTMLElement {
     media.innerHTML = '';
     if (s && s.attributes.entity_picture) {
       // Direct vidéo seulement si la caméra le permet (la sonnette Netatmo n'a qu'une image fixe).
-      if (customElements.get('ha-camera-stream') && cam.live !== false && (s.attributes.supported_features & 2)) {
+      const vpn = s.attributes.vpn_url;
+      const nativeHls = !this._liteNoHls && this._lite && vpn && /^https:/.test(vpn) && cam.live !== false && (s.attributes.supported_features & 2)
+        && document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+      if (nativeHls) {
+        // Tablette : flux Netatmo « medium » lu directement par Android (décodage matériel, bien plus fluide que le 1080p).
+        const v = document.createElement('video');
+        v.className = 'stream'; v.muted = true; v.autoplay = true; v.playsInline = true;
+        v.src = `${vpn}/live/files/${cam.quality || 'medium'}/index.m3u8`;
+        v.onerror = () => { if (!this.$.camOv.hidden) { this._liteNoHls = true; this._openCam(i, ringing); } };
+        media.appendChild(v);
+        v.play().catch(() => {});
+      } else if (customElements.get('ha-camera-stream') && cam.live !== false && (s.attributes.supported_features & 2)) {
         const st = document.createElement('ha-camera-stream');
         st.hass = this._hass;
         st.stateObj = s;
@@ -1500,6 +1511,7 @@ class EcranMuralCard extends HTMLElement {
 
   _closeCam() {
     clearInterval(this._fullCamTimer);
+    this.$.camMedia.querySelectorAll('video').forEach((v) => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* noop */ } });
     clearTimeout(this._dingTimer);
     this._state.cam = null;
     this.$.camMedia.innerHTML = '';
