@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.12';
+const EM_VERSION = '0.5.13';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -181,6 +181,19 @@ class EcranMuralCard extends HTMLElement {
     const h = this._hass;
     if (!h || !h.user || !/tablette/i.test(h.user.name || '') || !h.states[ent]) return;
     h.callService('input_datetime', 'set_datetime', { entity_id: ent, timestamp: Math.floor(Date.now() / 1000) }).catch(() => {});
+    // Diagnostic de fluidité : retard maximal de la boucle d'événements et mémoire JS sur la dernière minute.
+    if (!this._perf) {
+      this._perf = { max: 0, sum: 0, n: 0, last: performance.now() };
+      setInterval(() => {
+        const t = performance.now(), lag = Math.max(0, t - this._perf.last - 250);
+        this._perf.last = t; this._perf.max = Math.max(this._perf.max, lag); this._perf.sum += lag; this._perf.n++;
+      }, 250);
+    }
+    const p = this._perf, mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1;
+    const dom = this.shadowRoot ? this.shadowRoot.querySelectorAll('*').length : 0;
+    const txt = `lagmax=${Math.round(p.max)} lagmoy=${p.n ? Math.round(p.sum / p.n) : 0} mem=${mem}Mo dom=${dom} cam=${this._state && this._state.cam != null ? 'ouverte' : 'non'} appel=${this.$ && !this.$.callOv.hidden ? 'oui' : 'non'}`;
+    p.max = 0; p.sum = 0; p.n = 0;
+    if (h.states['input_text.tablette_perf']) h.callService('input_text', 'set_value', { entity_id: 'input_text.tablette_perf', value: txt.slice(0, 250) }).catch(() => {});
   }
 
   disconnectedCallback() {
