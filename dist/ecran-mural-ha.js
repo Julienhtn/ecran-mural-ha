@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.7';
+const EM_VERSION = '0.5.8';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -803,6 +803,11 @@ class EcranMuralCard extends HTMLElement {
     const img = this.$ && this.$['camimg' + i];
     if (this._liveThumb && this._liveThumb[i]) { this._startLiveThumb(i); return; }
     if (!img || !s || !s.attributes.entity_picture || this._state.idle) return;
+    // Sonnette sur transformateur : on la sollicite moins (1 image/min par défaut) pour ne pas la surcharger.
+    const every = (cam.refresh != null ? cam.refresh : (cam.entity === this._config.doorbell_camera ? 60 : 10)) * 1000;
+    this._camLast = this._camLast || {};
+    if (img.src && Date.now() - (this._camLast[i] || 0) < every - 500) return;
+    this._camLast[i] = Date.now();
     const url = s.attributes.entity_picture;
     img.src = `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
     const d = new Date();
@@ -1372,7 +1377,7 @@ class EcranMuralCard extends HTMLElement {
     this.$.camRing.hidden = !ringing;
     const media = this.$.camMedia;
     media.innerHTML = '';
-    if (s && s.state !== 'unavailable') {
+    if (s && s.attributes.entity_picture) {
       // Direct vidéo seulement si la caméra le permet (la sonnette Netatmo n'a qu'une image fixe).
       if (customElements.get('ha-camera-stream') && cam.live !== false && (s.attributes.supported_features & 2)) {
         const st = document.createElement('ha-camera-stream');
@@ -1386,6 +1391,9 @@ class EcranMuralCard extends HTMLElement {
         // Image entière (toute la hauteur), fond flouté de la même image pour remplir les côtés.
         const url = `${s.attributes.entity_picture}${s.attributes.entity_picture.includes('?') ? '&' : '?'}_=${Date.now()}`;
         media.innerHTML = `<div class="camfull-blur" style="background-image:url('${url}')"></div><img class="stream still" src="${url}" alt="">`;
+        const first = media.querySelector('img.still');
+        first.onerror = () => { if (!first.dataset.ok) media.innerHTML = `<span class="cam-empty big-empty">${emIcon('video', 64, 'rgba(255,255,255,0.16)', 1.3)}<span>Image indisponible pour le moment</span></span>`; };
+        first.onload = () => { first.dataset.ok = '1'; };
         clearInterval(this._fullCamTimer);
         this._fullCamTimer = setInterval(() => {
           const im = media.querySelector('img.still');
@@ -1394,7 +1402,7 @@ class EcranMuralCard extends HTMLElement {
           const pre = new Image();
           pre.onload = () => { im.src = u2; const b = media.querySelector('.camfull-blur'); if (b) b.style.backgroundImage = `url('${u2}')`; };
           pre.src = u2;
-        }, ringing ? 1000 : 3000);
+        }, ringing ? 2000 : (cam.entity === this._config.doorbell_camera ? 5000 : 3000));
       }
     } else {
       media.innerHTML = `<span class="cam-empty big-empty">${emIcon('video', 64, 'rgba(255,255,255,0.16)', 1.3)}<span>${emEsc(cam.empty || 'Caméra non connectée')}</span></span>`;
