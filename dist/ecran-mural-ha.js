@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.10';
+const EM_VERSION = '0.5.11';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -94,6 +94,7 @@ class EcranMuralCard extends HTMLElement {
   }
 
   setConfig(config) {
+    this._watch = null; this._seen = null;
     if (!config) throw new Error('Configuration manquante');
     this._config = Object.assign({}, EM_DEFAULT_CONFIG, config);
     this._built = false;
@@ -105,7 +106,9 @@ class EcranMuralCard extends HTMLElement {
     this._hass = hass;
     if (!this._config) return;
     if (!this._built) this._build();
-    this._update();
+    // Ne redessiner que si une entité utilisée par la carte a changé (HA envoie des mises à jour
+    // pour toute la maison plusieurs fois par seconde : sur une petite tablette ça fige l'écran).
+    if (this._changed(hass)) this._update();
     this._checkSignal();
     if (first) this._initAsync();
   }
@@ -125,6 +128,33 @@ class EcranMuralCard extends HTMLElement {
     if (type === 'sonnette' && this._config.doorbell_camera) this._doorbell();
     else if (type === 'visage') this._showVisitor(texte);
     else if (type === 'decroche') { this._ringing = false; clearTimeout(this._ringTimer); if (this.$ && this.$.callText && !this.$.callOv.hidden) this.$.callText.textContent = 'En ligne'; }
+  }
+
+  _watched() {
+    if (this._watch) return this._watch;
+    const set = new Set();
+    const walk = (v) => {
+      if (typeof v === 'string') { if (/^[a-z_]+\.[a-z0-9_]+$/.test(v)) set.add(v); }
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+    };
+    walk(this._config);
+    this._watch = [...set];
+    return this._watch;
+  }
+
+  _changed(hass) {
+    const list = this._watched();
+    let changed = !this._seen;
+    this._seen = this._seen || {};
+    for (const e of list) {
+      const st = hass.states[e];
+      if (this._seen[e] !== st) { this._seen[e] = st; changed = true; }
+    }
+    const now = Date.now();
+    if (!changed && now - (this._lastFull || 0) > 60000) changed = true;
+    if (changed) this._lastFull = now;
+    return changed;
   }
 
   get hass() { return this._hass; }
@@ -586,6 +616,10 @@ class EcranMuralCard extends HTMLElement {
       jour: ['#0C1017', 'rgba(242,181,68,0.18)', 'rgba(100,170,255,0.34)', 'rgba(80,200,190,0.14)'],
       soir: ['#0A0910', 'rgba(255,120,70,0.30)', 'rgba(130,80,210,0.30)', 'rgba(242,181,68,0.16)']
     }[this._moment()];
+    const sc0 = (this._config.scenes || [])[this._state.scene];
+    const key = this._moment() + '|' + (sc0 && sc0.tint || '');
+    if (this._momentKey === key) return;
+    this._momentKey = key;
     this.$.stage.style.background = pal[0];
     this.$.viewport.style.background = pal[0];
     this.$.b1.style.background = `radial-gradient(circle, ${pal[1]} 0%, transparent 62%)`;
