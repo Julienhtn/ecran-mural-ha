@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.15';
+const EM_VERSION = '0.5.16';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1534,7 +1534,7 @@ class EcranMuralCard extends HTMLElement {
     // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
     const isVdo = /vdo\.ninja/.test(call.room);
     // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
-    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user&width=1280&height=720&fps=24' : 'videodevice=1&facingmode=user&cleanoutput&codec=h264&width=640&height=480&fps=20'}&label=${encodeURIComponent(name)}`;
+    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user&width=1280&height=720&fps=24' : 'videodevice=1&facingmode=user&cleanoutput&width=480&height=360&fps=15'}&label=${encodeURIComponent(name)}`;
     const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
@@ -1609,7 +1609,11 @@ class EcranMuralCard extends HTMLElement {
     this.$.callOv.classList.remove('incall');
     // Tablette Android : après une visio, la WebView garde caméra/décodeur vidéo et devient très lente.
     // On recharge la page pour libérer complètement les ressources (2 à 5 s).
-    if (hadCall && this._lite) setTimeout(() => { try { location.reload(); } catch (e) { /* noop */ } }, 1500);
+    if (hadCall && this._lite) setTimeout(() => {
+      // Fully Kiosk : redémarrer l'appli libère vraiment caméra, micro et mode audio « appel » d'Android.
+      try { if (window.fully && typeof window.fully.restartApp === 'function') { window.fully.restartApp(); return; } } catch (e) { /* noop */ }
+      try { location.reload(); } catch (e) { /* noop */ }
+    }, 800);
     for (const t of this._callTargets || []) {
       if (!t.notify) continue;
       const [d, s] = t.notify.split('.');
