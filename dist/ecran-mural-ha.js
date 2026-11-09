@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.2';
+const EM_VERSION = '0.5.3';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -2106,6 +2106,11 @@ const EM_LITE_CSS = `
 .b1,.b2,.idle-glow,.halo{animation:none!important}
 .blob{filter:none!important;opacity:.55}
 .camfull-blur{display:none!important}
+.overlay{background:rgba(6,7,9,0.94)!important}
+.dialog{background:#15171B!important;border-color:rgba(255,255,255,0.14)!important}
+.card,.scene{background-color:rgba(20,22,27,0.82)!important}
+.pill-ghost{background:#24272E!important}
+.tabbar{background:#0C0D10!important}
 `;
 
 if (!customElements.get('ecran-mural-card')) {
