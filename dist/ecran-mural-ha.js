@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.17';
+const EM_VERSION = '0.5.18';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1534,7 +1534,14 @@ class EcranMuralCard extends HTMLElement {
     // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
     const isVdo = /vdo\.ninja/.test(call.room);
     // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
-    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user' : 'videodevice=1&facingmode=user'}&label=${encodeURIComponent(name)}`;
+    // Liaison directe (push / view) plutôt qu'une salle : chacun ne reçoit QUE la vidéo de l'autre,
+    // sans sa propre image ; un même téléphone ouvert deux fois est refusé (identifiant déjà utilisé).
+    const roomId = ((call.room.match(/[?&]room=([^&#]+)/) || [])[1] || 'maison').replace(/[^A-Za-z0-9_]/g, '_');
+    const slug = (n) => String(n || 'invite').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase() || 'invite';
+    const vdoBase = 'https://vdo.ninja/?';
+    const vdo = (name, phone) => phone
+      ? `${vdoBase}push=${roomId}_${slug(name)}&view=${roomId}_maison&webcam&autostart&nopreview&facingmode=user&label=${encodeURIComponent(name)}`
+      : `${vdoBase}push=${roomId}_maison&view=${targets.map((t) => `${roomId}_${slug(t.name)}`).join(',')}&webcam&autostart&nopreview&audiodevice=1&videodevice=1&facingmode=user&label=${encodeURIComponent(name)}`;
     const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
