@@ -2336,7 +2336,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .ev-body{padding-left:14px;min-width:0}
 .ev-title{font-size:19px;font-weight:500;margin:0;display:flex;align-items:center;gap:10px;min-width:0}.ev-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .ev-sub{margin:3px 0 0;font-size:13px;color:#8A8E97;display:flex;align-items:center;gap:5px}
-.ev-badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:rgba(242,181,68,0.16);color:#F2B544;flex:none}
+.ev-badge{white-space:nowrap;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:rgba(242,181,68,0.16);color:#F2B544;flex:none}
 .ev-badge.live{background:rgba(91,201,138,0.18);color:#7BE0A6}
 .day-empty{font-size:18px;padding:18px 0}
 .day-right{display:flex;flex-direction:column;gap:16px;min-height:0}
@@ -2382,8 +2382,8 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .day-right{padding-top:54px}
 .route{min-height:170px}
 .route-line{inset:12px 12px auto auto;width:96px;height:40px;opacity:.9}
-.tesla-top{grid-template-columns:1fr 220px}
-.car{width:220px}
+.tesla-top{grid-template-columns:1fr 196px}
+.car{width:196px}
 .tbar{position:relative;height:10px;border-radius:99px;background:rgba(255,255,255,0.08);overflow:hidden}
 .tbar i{position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:99px;background:linear-gradient(90deg,color-mix(in srgb,var(--bc) 55%,transparent),var(--bc));box-shadow:0 0 16px var(--bc)}
 .tbar b{position:absolute;top:0;bottom:0;width:2px;background:rgba(11,12,14,0.8)}
