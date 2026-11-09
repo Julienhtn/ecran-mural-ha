@@ -2108,7 +2108,6 @@ const EM_LITE_CSS = `
 .camfull-blur{display:none!important}
 .overlay{background:rgba(6,7,9,0.94)!important}
 .dialog{background:#15171B!important;border-color:rgba(255,255,255,0.14)!important}
-.card,.scene{background-color:rgba(20,22,27,0.82)!important}
 .pill-ghost{background:#24272E!important}
 .tabbar{background:#0C0D10!important}
 `;
