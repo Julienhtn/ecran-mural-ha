@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.6.0';
+const EM_VERSION = '0.6.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -191,7 +191,7 @@ class EcranMuralCard extends HTMLElement {
     }
     const p = this._perf, mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1;
     const dom = this.shadowRoot ? this.shadowRoot.querySelectorAll('*').length : 0;
-    const txt = `lagmax=${Math.round(p.max)} lagmoy=${p.n ? Math.round(p.sum / p.n) : 0} mem=${mem}Mo dom=${dom} cam=${this._state && this._state.cam != null ? 'ouverte' : 'non'} appel=${this.$ && !this.$.callOv.hidden ? 'oui' : 'non'}`;
+    const txt = `v${EM_VERSION} lagmax=${Math.round(p.max)} lagmoy=${p.n ? Math.round(p.sum / p.n) : 0} mem=${mem}Mo dom=${dom} cam=${this._state && this._state.cam != null ? 'ouverte' : 'non'} appel=${this.$ && !this.$.callOv.hidden ? 'oui' : 'non'}`;
     p.max = 0; p.sum = 0; p.n = 0;
     if (h.states['input_text.tablette_perf']) h.callService('input_text', 'set_value', { entity_id: 'input_text.tablette_perf', value: txt.slice(0, 250) }).catch(() => {});
   }
@@ -1536,7 +1536,10 @@ class EcranMuralCard extends HTMLElement {
     // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
     // Liaison directe (push / view) plutôt qu'une salle : chacun ne reçoit QUE la vidéo de l'autre,
     // sans sa propre image ; un même téléphone ouvert deux fois est refusé (identifiant déjà utilisé).
-    const roomId = ((call.room.match(/[?&]room=([^&#]+)/) || [])[1] || 'maison').replace(/[^A-Za-z0-9_]/g, '_');
+    // Identifiants uniques à chaque appel : un ancien onglet resté ouvert sur le téléphone
+    // ne peut plus bloquer le nouvel appel (« stream ID already in use »).
+    const callId = Date.now().toString(36).slice(-5);
+    const roomId = ((call.room.match(/[?&]room=([^&#]+)/) || [])[1] || 'maison').replace(/[^A-Za-z0-9_]/g, '_') + '_' + callId;
     const slug = (n) => String(n || 'invite').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase() || 'invite';
     const vdoBase = 'https://vdo.ninja/?';
     const vdo = (name, phone) => phone
@@ -1613,13 +1616,16 @@ class EcranMuralCard extends HTMLElement {
     // Raccrocher proprement : on demande d'abord à VDO.Ninja de fermer la connexion et de couper
     // caméra et micro (API iframe « close »), puis on retire l'iframe. Sans ça, Android garde la caméra.
     const frame = this.$.callFrame.querySelector('iframe');
-    this.$.callOv.hidden = true;
-    this.$.callOv.classList.remove('incall');
+    const done = () => { this.$.callFrame.innerHTML = ''; this.$.callOv.hidden = true; this.$.callOv.classList.remove('incall'); };
     if (frame) {
+      // On laisse 2 s à VDO.Ninja pour fermer la connexion et éteindre caméra et micro, écran « Appel terminé ».
+      this.$.callText.textContent = 'Appel terminé…';
       try { frame.contentWindow.postMessage({ close: true }, '*'); } catch (e) { /* noop */ }
-      setTimeout(() => { try { frame.src = 'about:blank'; } catch (e) { /* noop */ } this.$.callFrame.innerHTML = ''; }, 1200);
+      try { frame.contentWindow.postMessage({ camera: false }, '*'); frame.contentWindow.postMessage({ mic: false }, '*'); } catch (e) { /* noop */ }
+      frame.style.visibility = 'hidden';
+      setTimeout(() => { try { frame.src = 'about:blank'; } catch (e) { /* noop */ } setTimeout(done, 300); }, 2000);
     } else {
-      this.$.callFrame.innerHTML = '';
+      done();
     }
 
     for (const t of this._callTargets || []) {
