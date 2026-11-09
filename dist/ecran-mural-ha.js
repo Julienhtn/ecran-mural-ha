@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.8';
+const EM_VERSION = '0.5.9';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -642,8 +642,36 @@ class EcranMuralCard extends HTMLElement {
     if (a.state !== 'triggered' && !this.$.intrOv.hidden) this.$.intrOv.hidden = true;
     if (this._prevAlarm && this._prevAlarm !== a.state && this._state.pad && a.state === 'disarmed' && this._prevAlarm !== 'disarmed') this._closePad();
     this._beepFor(a.state);
+    this._countdown(a);
     this._prevAlarm = a.state;
     if (this._state.pad && !this._submitting) this._renderPad();
+  }
+
+  /* Décompte pendant l'armement (temps pour sortir) et le délai d'entrée. */
+  _countdown(a) {
+    const s = this._st(this._config.alarm);
+    const active = (a.state === 'arming' || a.state === 'pending') && s && Number(s.attributes.delay) > 0;
+    if (!active) {
+      if (this._cdTimer) { clearInterval(this._cdTimer); this._cdTimer = null; }
+      this.$.alarmBtn.classList.remove('counting');
+      return;
+    }
+    const end = Date.parse(s.last_changed) + Number(s.attributes.delay) * 1000;
+    if (this._cdEnd === end && this._cdTimer) return;
+    this._cdEnd = end;
+    clearInterval(this._cdTimer);
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((this._cdEnd - Date.now()) / 1000));
+      const cur = this._alarmInfo();
+      if (cur.state !== 'arming' && cur.state !== 'pending') return;
+      this.$.alarmAction.textContent = `${left}`;
+      this.$.alarmBtn.classList.add('counting');
+      this.$.alarmSub.textContent = `${cur.sub} · ${left} s`;
+      if (this.$.idleAlarmTxt) this.$.idleAlarmTxt.textContent = `Alarme · ${cur.label} ${left} s`;
+      if (this._state.pad && this.$.padEyebrow) this.$.padEyebrow.textContent = `Alarme · ${cur.label} · ${left} s`;
+    };
+    tick();
+    this._cdTimer = setInterval(tick, 250);
   }
 
   _openSummary() {
@@ -1980,6 +2008,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .call-frame{flex:1;border-radius:24px;overflow:hidden;background:#000}
 .call-ext{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.5;color:#A3A6AD}
 .call-frame iframe{width:100%;height:100%;border:0}
+.counting [data-ref="alarmAction"]{font-size:44px;font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums}
 .call-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 /* En appel : la vidéo prend tout l'écran, bouton Raccrocher par-dessus. */
 .overlay.incall{background:#000!important;padding:0}
