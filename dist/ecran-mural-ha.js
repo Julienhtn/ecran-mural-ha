@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.19';
+const EM_VERSION = '0.6.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -853,7 +853,7 @@ class EcranMuralCard extends HTMLElement {
     });
   }
 
-  _refreshCams() { (this._config && this._config.cameras || []).slice(0, 2).forEach((_, i) => this._refreshCam(i)); }
+  _refreshCams() { if (this.$ && this.$.callOv && !this.$.callOv.hidden) return; (this._config && this._config.cameras || []).slice(0, 2).forEach((_, i) => this._refreshCam(i)); }
 
   /* Image fixe indisponible (ex. Netatmo extérieure) : vignette en direct, coupée pendant la veille. */
   _camFallback(i) {
@@ -1540,8 +1540,8 @@ class EcranMuralCard extends HTMLElement {
     const slug = (n) => String(n || 'invite').normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase() || 'invite';
     const vdoBase = 'https://vdo.ninja/?';
     const vdo = (name, phone) => phone
-      ? `${vdoBase}push=${roomId}_${slug(name)}&view=${roomId}_maison&webcam&autostart&nopreview&facingmode=user&label=${encodeURIComponent(name)}`
-      : `${vdoBase}push=${roomId}_maison&view=${targets.map((t) => `${roomId}_${slug(t.name)}`).join(',')}&webcam&autostart&nopreview&audiodevice=1&videodevice=1&facingmode=user&label=${encodeURIComponent(name)}`;
+      ? `${vdoBase}push=${roomId}_${slug(name)}&view=${roomId}_maison&webcam&autostart&nopreview&facingmode=user&quality=1&fps=30&label=${encodeURIComponent(name)}`
+      : `${vdoBase}push=${roomId}_maison&view=${targets.map((t) => `${roomId}_${slug(t.name)}`).join(',')}&webcam&autostart&nopreview&audiodevice=1&videodevice=1&facingmode=user&quality=2&fps=15&label=${encodeURIComponent(name)}`;
     const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
@@ -1610,13 +1610,17 @@ class EcranMuralCard extends HTMLElement {
   async _hangup() {
     this._ringing = false;
     clearTimeout(this._ringTimer);
-    const hadCall = !!this.$.callFrame.querySelector('iframe');
-    this.$.callFrame.innerHTML = '';
+    // Raccrocher proprement : on demande d'abord à VDO.Ninja de fermer la connexion et de couper
+    // caméra et micro (API iframe « close »), puis on retire l'iframe. Sans ça, Android garde la caméra.
+    const frame = this.$.callFrame.querySelector('iframe');
     this.$.callOv.hidden = true;
     this.$.callOv.classList.remove('incall');
-    // Tablette (Fully Kiosk) : Android garde caméra/micro/mode « appel » après la visio et devient très lent.
-    // Redémarrer l'appli Fully (≈ 5 s) libère tout. Ne concerne que la tablette.
-    if (hadCall && window.fully && typeof window.fully.restartApp === 'function') setTimeout(() => { try { window.fully.restartApp(); } catch (e) { /* noop */ } }, 1500);
+    if (frame) {
+      try { frame.contentWindow.postMessage({ close: true }, '*'); } catch (e) { /* noop */ }
+      setTimeout(() => { try { frame.src = 'about:blank'; } catch (e) { /* noop */ } this.$.callFrame.innerHTML = ''; }, 1200);
+    } else {
+      this.$.callFrame.innerHTML = '';
+    }
 
     for (const t of this._callTargets || []) {
       if (!t.notify) continue;
