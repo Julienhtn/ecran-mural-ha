@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.5';
+const EM_VERSION = '0.5.6';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1397,6 +1397,7 @@ class EcranMuralCard extends HTMLElement {
   _openCall() {
     this.$.callPick.hidden = false;
     this.$.callLive.hidden = true;
+    this.$.callOv.classList.remove('incall');
     this.$.callOv.hidden = false;
   }
 
@@ -1408,7 +1409,7 @@ class EcranMuralCard extends HTMLElement {
     // VDO.Ninja : salle sans compte, s'intègre dans l'écran, démarre caméra + micro sans clic.
     const isVdo = /vdo\.ninja/.test(call.room);
     // Téléphone : caméra frontale (facingmode=user). Écran : premier périphérique trouvé.
-    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user' : 'videodevice=1&facingmode=user'}&label=${encodeURIComponent(name)}`;
+    const vdo = (name, phone) => `${call.room}${call.room.includes('?') ? '&' : '?'}webcam&autostart&nopreview&audiodevice=1&${phone ? 'facingmode=user' : 'videodevice=1&facingmode=user&cleanoutput'}&label=${encodeURIComponent(name)}`;
     const direct = (name, phone) => isVdo ? vdo(name, phone) : `${call.room}#config.prejoinConfig.enabled=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(JSON.stringify(name))}`;
     // Page relais https servie par Home Assistant (Nabu Casa) : allume micro et caméra à l'entrée.
     const base = call.relay ? await this._httpsBase() : null;
@@ -1451,6 +1452,7 @@ class EcranMuralCard extends HTMLElement {
     }
     this.$.callPick.hidden = true;
     this.$.callLive.hidden = false;
+    this.$.callOv.classList.add('incall');
     this.$.callText.textContent = targets.length > 1 ? 'Ça sonne chez tout le monde · le premier qui répond' : `Ça sonne chez ${targets[0] ? targets[0].name : ''}`;
     if (window.isSecureContext) {
       this.$.callFrame.innerHTML = `<iframe src="${emEsc(jitsi(call.name || 'Maison'))}" allow="camera *; microphone *; fullscreen; display-capture; autoplay; screen-wake-lock" title="Appel visio"></iframe>`;
@@ -1478,6 +1480,7 @@ class EcranMuralCard extends HTMLElement {
     clearTimeout(this._ringTimer);
     this.$.callFrame.innerHTML = '';
     this.$.callOv.hidden = true;
+    this.$.callOv.classList.remove('incall');
     for (const t of this._callTargets || []) {
       if (!t.notify) continue;
       const [d, s] = t.notify.split('.');
@@ -1952,6 +1955,16 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .call-ext{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.5;color:#A3A6AD}
 .call-frame iframe{width:100%;height:100%;border:0}
 .call-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+/* En appel : la vidéo prend tout l'écran, bouton Raccrocher par-dessus. */
+.overlay.incall{background:#000!important;padding:0}
+.overlay.incall .callbox{position:absolute;inset:0;width:auto;height:auto;border-radius:0;padding:0;border:0;background:#000!important;box-shadow:none;animation:none}
+.overlay.incall .callbox > .xbtn{display:none}
+.overlay.incall .call-live{position:absolute;inset:0;gap:0}
+.overlay.incall .call-frame{position:absolute;inset:0;border-radius:0}
+.overlay.incall .call-bar{position:absolute;left:0;right:0;bottom:0;padding:60px 32px 28px;justify-content:center;flex-direction:column;gap:14px;background:linear-gradient(to top,rgba(0,0,0,0.75),transparent);pointer-events:none}
+.overlay.incall .call-bar > *{pointer-events:auto}
+.overlay.incall .call-bar .muted{color:#E6E7EA;font-size:16px;text-shadow:0 1px 4px #000}
+.overlay.incall .pill-red{padding:18px 36px;font-size:20px}
 
 .idle{position:absolute;inset:0;z-index:30;border:0;padding:0;margin:0;width:1280px;height:800px;background:#020306;text-align:center;overflow:hidden;animation:fadein 1.2s ease;display:flex;align-items:center;justify-content:center}
 .idle-glow{position:absolute;width:900px;height:900px;left:50%;top:50%;margin:-450px 0 0 -450px;border-radius:50%;animation:drift 30s ease-in-out infinite}
