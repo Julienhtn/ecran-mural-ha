@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.1';
+const EM_VERSION = '0.5.2';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -205,7 +205,8 @@ class EcranMuralCard extends HTMLElement {
         <span><b>Tout le monde</b><span>Le premier qui répond</span></span>
       </button>` : '');
 
-    this.shadowRoot.innerHTML = `<style>${EM_CSS}</style>
+    const lite = c.lite === true || (c.lite !== false && (/Android/i.test(navigator.userAgent) || /[?&]lite\b/.test(location.search)));
+    this.shadowRoot.innerHTML = `<style>${EM_CSS}${lite ? EM_LITE_CSS : ''}</style>
 <div class="viewport" data-ref="viewport">
  <div class="stage" data-ref="stage" style="--accent:${emEsc(c.accent)}">
   <div class="bg" aria-hidden="true">
@@ -2097,6 +2098,14 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 @keyframes nudgeUp{0%,100%{transform:none}50%{transform:translateY(-5px)}}
 @keyframes nudgeDown{0%,100%{transform:none}50%{transform:translateY(5px)}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+`;
+
+/* Mode léger (tablettes Android peu puissantes) : pas de flous en arrière-plan ni d'animations permanentes. */
+const EM_LITE_CSS = `
+*,*::before,*::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.b1,.b2,.idle-glow,.halo{animation:none!important}
+.blob{filter:none!important;opacity:.55}
+.camfull-blur{display:none!important}
 `;
 
 if (!customElements.get('ecran-mural-card')) {
