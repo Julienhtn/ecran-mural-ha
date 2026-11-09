@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.13';
+const EM_VERSION = '0.5.14';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -278,7 +278,7 @@ class EcranMuralCard extends HTMLElement {
         <span><b>Tout le monde</b><span>Le premier qui répond</span></span>
       </button>` : '');
 
-    const lite = c.lite === true || (c.lite !== false && (/Android/i.test(navigator.userAgent) || /[?&]lite\b/.test(location.search)));
+    const lite = this._lite = c.lite === true || (c.lite !== false && (/Android/i.test(navigator.userAgent) || /[?&]lite\b/.test(location.search)));
     this.shadowRoot.innerHTML = `<style>${lite ? emLiteCss(EM_CSS) + EM_LITE_CSS : EM_CSS}</style>
 <div class="viewport" data-ref="viewport">
  <div class="stage" data-ref="stage" style="--accent:${emEsc(c.accent)}">
@@ -1591,9 +1591,13 @@ class EcranMuralCard extends HTMLElement {
   async _hangup() {
     this._ringing = false;
     clearTimeout(this._ringTimer);
+    const hadCall = !!this.$.callFrame.querySelector('iframe');
     this.$.callFrame.innerHTML = '';
     this.$.callOv.hidden = true;
     this.$.callOv.classList.remove('incall');
+    // Tablette Android : après une visio, la WebView garde caméra/décodeur vidéo et devient très lente.
+    // On recharge la page pour libérer complètement les ressources (2 à 5 s).
+    if (hadCall && this._lite) setTimeout(() => { try { location.reload(); } catch (e) { /* noop */ } }, 1500);
     for (const t of this._callTargets || []) {
       if (!t.notify) continue;
       const [d, s] = t.notify.split('.');
