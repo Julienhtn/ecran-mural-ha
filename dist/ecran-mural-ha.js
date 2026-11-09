@@ -4,13 +4,19 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.6.1';
+const EM_VERSION = '0.7.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
 const EM_H = 800;
 
 const EM_ICONS = {
+  school: '<path d="M3 10l9-5 9 5-9 5-9-5z"></path><path d="M7 12.2V17c1.6 1.4 3.2 2 5 2s3.4-.6 5-2v-4.8"></path><path d="M21 10v5"></path>',
+  office: '<rect x="4" y="3" width="11" height="18" rx="1.5"></rect><path d="M15 9h4.5a.5.5 0 0 1 .5.5V21"></path><path d="M8 7h3M8 11h3M8 15h3"></path><path d="M3 21h18"></path>',
+  fan: '<circle cx="12" cy="12" r="1.6"></circle><path d="M12 10.4C12 6 13.5 3.5 16 3.5c2 0 2.6 2.2 1.2 3.6-1.3 1.3-3.4 2.2-5.2 3.3z"></path><path d="M13.6 12c4.4 0 6.9 1.5 6.9 4 0 2-2.2 2.6-3.6 1.2-1.3-1.3-2.2-3.4-3.3-5.2z"></path><path d="M12 13.6c0 4.4-1.5 6.9-4 6.9-2 0-2.6-2.2-1.2-3.6 1.3-1.3 3.4-2.2 5.2-3.3z"></path><path d="M10.4 12C6 12 3.5 10.5 3.5 8c0-2 2.2-2.6 3.6-1.2 1.3 1.3 2.2 3.4 3.3 5.2z"></path>',
+  snow: '<path d="M12 2.5v19M4 7l16 10M4 17L20 7"></path><path d="M9.5 4l2.5 2 2.5-2M9.5 20l2.5-2 2.5 2M3.6 10.2l3.2-.6-1-3M20.4 13.8l-3.2.6 1 3M3.6 13.8l3.2.6-1 3M20.4 10.2l-3.2-.6 1-3"></path>',
+  cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path>',
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"></path><circle cx="12" cy="10" r="2.3"></circle>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2.5"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path><path d="M12 15v2.5"></path>',
   shield: '<path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"></path><path d="M9.5 12l1.8 1.8L15 10"></path>',
   away: '<path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-5h4v5"></path>',
@@ -108,7 +114,7 @@ class EcranMuralCard extends HTMLElement {
     if (!this._built) this._build();
     // Ne redessiner que si une entité utilisée par la carte a changé (HA envoie des mises à jour
     // pour toute la maison plusieurs fois par seconde : sur une petite tablette ça fige l'écran).
-    if (this._changed(hass)) this._update();
+    if (this._changed(hass)) { this._update(); if (this.$ && this.$.dayOv && !this.$.dayOv.hidden) { this._renderRoutes(); this._renderTesla(); } }
     this._checkSignal();
     if (first) this._initAsync();
   }
@@ -297,7 +303,7 @@ class EcranMuralCard extends HTMLElement {
             ${c.call ? `<button class="sq sq-green press" data-act="call" aria-label="Appel visio">${emIcon('video', 20)}</button>` : ''}
           </div>
         </div>
-        <p class="time" data-ref="time" aria-live="off"></p>
+        <p class="time time-btn" data-ref="time" data-act="day" role="button" aria-label="Ma journée" aria-live="off"></p>
         <div class="outdoor">${emIcon('thermo', 17, '#F2B544')}<span class="outdoor-t" data-ref="outT">–</span><span class="muted small" data-ref="outF">Extérieur</span></div>
       </section>
 
@@ -461,6 +467,23 @@ class EcranMuralCard extends HTMLElement {
       <div class="camfull-actions">
         <button class="pill pill-ghost press" data-act="closecam">Retour</button>
       </div>
+    </div>
+  </div>
+
+  <div class="overlay day-ov" data-ref="dayOv" hidden>
+    <div class="dialog daybox" role="dialog" aria-modal="true" aria-label="Ma journée">
+      <button class="xbtn press" data-act="closeday" aria-label="Fermer">${emIcon('close', 20, 'currentColor', 2)}</button>
+      <div class="day-left">
+        <p class="eyebrow" data-ref="dayDate"></p>
+        <h2 class="day-hello" data-ref="dayHello"></h2>
+        <div class="ribbon" data-ref="dayRibbon" aria-hidden="true"></div>
+        <div class="day-events" data-ref="dayEvents"></div>
+      </div>
+      <div class="day-right">
+        <div class="routes" data-ref="dayRoutes"></div>
+        <div class="tesla" data-ref="dayTesla"></div>
+      </div>
+      <figure class="quote" data-ref="dayQuote"></figure>
     </div>
   </div>
 
@@ -1232,8 +1255,198 @@ class EcranMuralCard extends HTMLElement {
       case 'call': this._openCall(); break;
       case 'calltarget': this._startCall(i); break;
       case 'hangup': this._hangup(); break;
+      case 'day': this._openDay(); break;
+      case 'closeday': this._closeDay(); break;
+      case 'tesla': this._teslaAct(el.dataset.a); break;
       default: break;
     }
+  }
+
+  /* ---------- Ma journée (clic sur l'horloge) ---------- */
+  _openDay() {
+    const ov = this.$.dayOv;
+    ov.hidden = false;
+    this._renderDay();
+    this._loadDayEvents();
+    clearInterval(this._dayTimer);
+    this._dayTimer = setInterval(() => { if (ov.hidden) { clearInterval(this._dayTimer); return; } this._renderDay(true); }, 20000);
+  }
+
+  _closeDay() { this.$.dayOv.hidden = true; clearInterval(this._dayTimer); }
+
+  _renderDay(partial) {
+    const d = this._config.day || {};
+    const now = new Date();
+    const h = now.getHours();
+    const who = d.name || 'Julien';
+    this.$.dayDate.textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    this.$.dayHello.innerHTML = `${h < 5 ? 'Bonne nuit' : h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir'}, <em>${emEsc(who)}</em>`;
+    this._renderRoutes();
+    this._renderTesla();
+    if (!partial) this._renderQuote();
+    if (this._dayEvents) this._renderEvents();
+  }
+
+  async _loadDayEvents() {
+    const cals = (this._config.day || {}).calendars || [];
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    if (!cals.length) { this._dayEvents = []; this._renderEvents('Aucun agenda configuré'); return; }
+    if (!this._dayEvents) this.$.dayEvents.innerHTML = '<p class="muted day-empty">Chargement de l’agenda…</p>';
+    const all = [];
+    let missing = 0;
+    await Promise.all(cals.map(async (cal, ci) => {
+      if (!this._hass.states[cal.entity]) { missing++; return; }
+      try {
+        const evs = await this._hass.callApi('GET', `calendars/${cal.entity}?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
+        for (const ev of evs || []) {
+          const allDay = !!(ev.start && ev.start.date && !ev.start.dateTime);
+          const s0 = new Date(allDay ? ev.start.date + 'T00:00:00' : ev.start.dateTime);
+          const e0 = new Date(allDay ? ev.end.date + 'T00:00:00' : ev.end.dateTime);
+          all.push({ title: ev.summary || '(sans titre)', loc: ev.location || '', start: s0, end: e0, allDay, cal: ci });
+        }
+      } catch (e) { missing++; }
+    }));
+    all.sort((a, b) => (b.allDay - a.allDay) || (a.start - b.start));
+    this._dayEvents = all;
+    this._dayMissing = missing;
+    this._renderEvents();
+  }
+
+  _renderEvents(msg) {
+    const d = this._config.day || {};
+    const cals = d.calendars || [];
+    const colors = ['#F2B544', '#7FB0FF', '#5BC98A', '#E58BD0'];
+    const col = (i) => (cals[i] && cals[i].color) || colors[i % colors.length];
+    const evs = this._dayEvents || [];
+    const now = new Date();
+    const fmt = (t) => t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    // Ruban de la journée 7h → 22h
+    const H0 = d.ribbon_start != null ? d.ribbon_start : 7, H1 = d.ribbon_end != null ? d.ribbon_end : 22;
+    const pos = (t) => Math.max(0, Math.min(100, ((t.getHours() + t.getMinutes() / 60) - H0) / (H1 - H0) * 100));
+    let rib = '';
+    for (let hh = H0; hh <= H1; hh += 3) rib += `<span class="rib-tick" style="left:${(hh - H0) / (H1 - H0) * 100}%">${hh}h</span>`;
+    for (const ev of evs.filter((e) => !e.allDay)) {
+      const a = pos(ev.start), b = pos(ev.end);
+      if (b <= 0 || a >= 100) continue;
+      rib += `<span class="rib-ev" style="left:${a}%;width:${Math.max(1.2, b - a)}%;--c:${col(ev.cal)}"></span>`;
+    }
+    rib += `<span class="rib-now" style="left:${pos(now)}%"><i></i></span>`;
+    this.$.dayRibbon.innerHTML = `<div class="rib-track"></div>${rib}`;
+    // Liste
+    const list = evs;
+    if (!list.length) {
+      const m = msg || (this._dayMissing && this._dayMissing === cals.length ? 'Agenda non connecté' : (evs.length ? 'Plus rien aujourd’hui · profite' : 'Journée libre · rien à l’agenda'));
+      this.$.dayEvents.innerHTML = `<p class="muted day-empty">${emEsc(m)}</p>`;
+      return;
+    }
+    const nextIdx = list.findIndex((e) => !e.allDay && e.start > now);
+    // Si la journée est chargée, on masque d'abord les rendez-vous passés.
+    const shown = list.length > 7 ? list.filter((e) => e.allDay || e.end > now).slice(0, 7) : list;
+    this.$.dayEvents.innerHTML = shown.map((e, k) => {
+      const live = !e.allDay && e.start <= now && e.end > now;
+      const past = !e.allDay && e.end <= now;
+      const mins = Math.round((e.start - now) / 60000);
+      const badge = live ? '<span class="ev-badge live">En cours</span>' : (list.indexOf(e) === nextIdx && mins <= 120 ? `<span class="ev-badge">dans ${mins < 60 ? mins + ' min' : Math.floor(mins / 60) + ' h ' + String(mins % 60).padStart(2, '0')}</span>` : '');
+      return `<div class="ev ${live ? 'ev-live' : ''} ${past ? 'ev-past' : ''}" style="--c:${col(e.cal)}">
+        <div class="ev-time">${e.allDay ? '<span>Journée</span>' : `<span>${fmt(e.start)}</span><small>${fmt(e.end)}</small>`}</div>
+        <div class="ev-body"><p class="ev-title"><span class="ev-t">${emEsc(e.title)}</span>${badge}</p>
+        <p class="ev-sub">${emEsc((cals[e.cal] && cals[e.cal].name) || '')}${e.loc ? ` · ${emIcon('pin', 13)} ${emEsc(e.loc.split(',')[0])}` : ''}</p></div>
+      </div>`;
+    }).join('') + (list.length > 7 ? `<p class="muted small">+ ${list.length - 7} autre${list.length > 8 ? 's' : ''}</p>` : '');
+  }
+
+  _renderRoutes() {
+    const routes = (this._config.day || {}).routes || [];
+    const now = new Date();
+    this.$.dayRoutes.innerHTML = routes.map((r, i) => {
+      const s = this._st(r.entity);
+      const ok = s && !isNaN(parseFloat(s.state));
+      const min = ok ? Math.round(parseFloat(s.state)) : null;
+      const usual = r.usual || null;
+      const ratio = usual && min ? min / usual : 1;
+      const tone = !ok ? 'off' : ratio > 1.35 ? 'red' : ratio > 1.12 ? 'amber' : 'green';
+      const arr = ok ? new Date(now.getTime() + min * 60000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const km = ok && s.attributes.distance ? `${Math.round(s.attributes.distance * 10) / 10} km` : '';
+      const via = ok && s.attributes.route ? String(s.attributes.route).split(/[;,]/)[0].trim() : '';
+      return `<div class="route tone-${tone}">
+        <svg class="route-line" viewBox="0 0 220 60" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M8 46 C 60 46, 70 14, 120 22 S 190 42, 212 14" class="rl-base"></path>
+          <path d="M8 46 C 60 46, 70 14, 120 22 S 190 42, 212 14" class="rl-flow"></path>
+          <circle cx="8" cy="46" r="4" class="rl-home"></circle><circle cx="212" cy="14" r="5" class="rl-dest"></circle>
+        </svg>
+        <div class="route-head"><span class="route-ico">${emIcon(r.icon || (i ? 'office' : 'school'), 18)}</span><span class="route-name">${emEsc(r.name || '')}</span></div>
+        <div class="route-main">${ok ? `<span class="route-min">${min}</span><span class="route-unit">min</span>` : '<span class="muted">non connecté</span>'}</div>
+        <p class="route-sub">${ok ? `Arrivée <b>${arr}</b>${km ? ` · ${km}` : ''}${via ? ` · ${emEsc(via)}` : ''}` : ''}</p>
+      </div>`;
+    }).join('');
+  }
+
+  _renderTesla() {
+    const t = (this._config.day || {}).tesla;
+    const box = this.$.dayTesla;
+    if (!t) { box.hidden = true; return; }
+    box.hidden = false;
+    const num = (e) => { const s = this._st(e); return s && !isNaN(parseFloat(s.state)) ? parseFloat(s.state) : null; };
+    const bat = num(t.battery), range = num(t.range);
+    const cl = this._st(t.climate);
+    const climOn = cl && cl.state && cl.state !== 'off' && cl.state !== 'unavailable';
+    const target = cl && cl.attributes.temperature != null ? Number(cl.attributes.temperature) : null;
+    const inside = cl && cl.attributes.current_temperature != null ? Math.round(cl.attributes.current_temperature) : null;
+    const df = this._st(t.defrost);
+    const defOn = df && df.state === 'on';
+    const chg = this._st(t.charging);
+    const charging = chg && (chg.state === 'on' || /charging|en charge/i.test(chg.state));
+    const pct = bat == null ? 0 : Math.max(0, Math.min(100, bat));
+    const batCol = pct < 20 ? '#E5675B' : pct < 40 ? '#F2B544' : '#5BC98A';
+    box.innerHTML = `
+      <div class="tesla-top">
+        <div><p class="eyebrow">${emEsc(t.name || 'Voiture')}</p>
+          <p class="tesla-pct">${bat == null ? '–' : Math.round(bat)}<span>%</span>${charging ? `<span class="tesla-chg">${emIcon('bolt', 16)} en charge</span>` : ''}</p>
+          <p class="muted">${range == null ? 'autonomie –' : `${Math.round(range)} km d’autonomie`}${inside != null ? ` · ${inside}° à bord` : ''}</p></div>
+        <svg class="car" viewBox="0 0 240 92" aria-hidden="true">
+          <defs><clipPath id="carclip"><path d="M18 62c0-9 6-14 16-16l30-6c14-12 30-20 58-20 26 0 44 8 62 22l26 5c8 2 12 7 12 15v8c0 4-3 6-7 6H25c-4 0-7-2-7-6z"></path></clipPath>
+          <linearGradient id="carfill" x1="0" x2="1"><stop offset="0" stop-color="${batCol}" stop-opacity=".55"></stop><stop offset="1" stop-color="${batCol}" stop-opacity=".9"></stop></linearGradient></defs>
+          <path class="car-body" d="M18 62c0-9 6-14 16-16l30-6c14-12 30-20 58-20 26 0 44 8 62 22l26 5c8 2 12 7 12 15v8c0 4-3 6-7 6H25c-4 0-7-2-7-6z"></path>
+          <rect clip-path="url(#carclip)" x="0" y="0" height="92" width="${(pct / 100) * 240}" fill="url(#carfill)" class="car-fill"></rect>
+          <path class="car-glass" d="M70 40c12-10 26-15 50-15 22 0 36 6 50 15z"></path>
+          <circle cx="62" cy="76" r="12" class="car-wheel"></circle><circle cx="186" cy="76" r="12" class="car-wheel"></circle>
+        </svg>
+      </div>
+      <div class="tbar" style="--p:${pct}%;--bc:${batCol}"><i></i>${[20, 40, 60, 80].map((x) => `<b style="left:${x}%"></b>`).join('')}</div>
+      <div class="tesla-ctl">
+        <button class="tbtn press ${climOn ? 'on' : ''}" data-act="tesla" data-a="clim" ${t.climate ? '' : 'disabled'}>${emIcon('fan', 22)}<span>Ventilation</span></button>
+        <button class="tbtn press ${defOn ? 'on' : ''}" data-act="tesla" data-a="defrost" ${t.defrost ? '' : 'disabled'}>${emIcon('snow', 22)}<span>Dégivrage</span></button>
+        <div class="ttemp"><button class="tround press" data-act="tesla" data-a="tm" ${t.climate ? '' : 'disabled'} aria-label="Moins chaud">${emIcon('minus', 18)}</button>
+          <span class="ttemp-v">${target == null ? '–' : target.toFixed(1).replace('.0', '')}°</span>
+          <button class="tround press" data-act="tesla" data-a="tp" ${t.climate ? '' : 'disabled'} aria-label="Plus chaud">${emIcon('plus', 18)}</button></div>
+      </div>`;
+  }
+
+  async _teslaAct(a) {
+    const t = (this._config.day || {}).tesla || {};
+    const cl = this._st(t.climate);
+    if (a === 'clim' && t.climate) {
+      const on = cl && cl.state !== 'off';
+      await this._call('climate', on ? 'turn_off' : 'turn_on', { entity_id: t.climate });
+    } else if (a === 'defrost' && t.defrost) {
+      const dom = t.defrost.split('.')[0];
+      if (dom === 'button') await this._call('button', 'press', { entity_id: t.defrost });
+      else await this._call(dom === 'switch' ? 'switch' : 'homeassistant', 'toggle', { entity_id: t.defrost });
+    } else if ((a === 'tm' || a === 'tp') && t.climate && cl) {
+      const cur = Number(cl.attributes.temperature) || 20;
+      const v = Math.max(15, Math.min(28, cur + (a === 'tp' ? 0.5 : -0.5)));
+      await this._call('climate', 'set_temperature', { entity_id: t.climate, temperature: v });
+    }
+    setTimeout(() => this._renderTesla(), 1500);
+  }
+
+  _renderQuote() {
+    const q = EM_QUOTES;
+    const now = new Date();
+    const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+    const [txt, who] = q[day % q.length];
+    this.$.dayQuote.innerHTML = `<span class="q-mark" aria-hidden="true">“</span><blockquote>${emEsc(txt)}</blockquote><figcaption>${emEsc(who)}</figcaption>`;
   }
 
   _toast(msg) {
@@ -2102,6 +2315,78 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .call-ext{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.5;color:#A3A6AD}
 .call-frame iframe{width:100%;height:100%;border:0}
 .counting [data-ref="alarmAction"]{font-size:44px;font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums}
+/* ---------- Ma journée ---------- */
+.time-btn{cursor:pointer}
+.daybox{width:1152px;height:720px;padding:40px 44px 36px;display:grid;grid-template-columns:1fr 400px;grid-template-rows:1fr auto;gap:26px 36px;background:radial-gradient(120% 90% at 0% 0%,rgba(242,181,68,0.10),transparent 55%),radial-gradient(90% 80% at 100% 100%,rgba(120,150,255,0.10),transparent 60%),rgba(16,18,24,0.72)}
+.day-left{display:flex;flex-direction:column;min-height:0}
+.day-hello{font-size:46px;font-weight:300;letter-spacing:-0.025em;margin:6px 0 22px;line-height:1.05}
+.day-hello em{font-style:normal;background:linear-gradient(90deg,#F2B544,#FFD99A);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:500}
+.ribbon{position:relative;height:46px;margin:0 6px 22px}
+.rib-track{position:absolute;left:0;right:0;top:12px;height:10px;border-radius:99px;background:repeating-linear-gradient(90deg,rgba(255,255,255,0.10) 0 2px,transparent 2px 7px)}
+.rib-tick{position:absolute;top:30px;transform:translateX(-50%);font-size:11px;color:#8A8E97;font-variant-numeric:tabular-nums}
+.rib-ev{position:absolute;top:8px;height:18px;border-radius:7px;background:var(--c);box-shadow:0 0 18px -4px var(--c);opacity:.9}
+.rib-now{position:absolute;top:0;bottom:12px;width:2px;background:#fff;transform:translateX(-1px);border-radius:2px;box-shadow:0 0 12px #fff}
+.rib-now i{position:absolute;top:-4px;left:-4px;width:10px;height:10px;border-radius:50%;background:#fff}
+.day-events{display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.ev{display:grid;grid-template-columns:78px 1fr;gap:16px;align-items:center;padding:12px 16px 12px 0;border-radius:18px;position:relative}
+.ev::before{content:"";position:absolute;left:84px;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--c)}
+.ev-live{background:linear-gradient(90deg,rgba(255,255,255,0.07),transparent)}
+.ev-time{text-align:right;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;line-height:1.15}
+.ev-time span{font-size:20px;font-weight:500}.ev-time small{font-size:12px;color:#8A8E97}
+.ev-body{padding-left:14px;min-width:0}
+.ev-title{font-size:19px;font-weight:500;margin:0;display:flex;align-items:center;gap:10px;min-width:0}.ev-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ev-sub{margin:3px 0 0;font-size:13px;color:#8A8E97;display:flex;align-items:center;gap:5px}
+.ev-badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:rgba(242,181,68,0.16);color:#F2B544;flex:none}
+.ev-badge.live{background:rgba(91,201,138,0.18);color:#7BE0A6}
+.day-empty{font-size:18px;padding:18px 0}
+.day-right{display:flex;flex-direction:column;gap:16px;min-height:0}
+.routes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.route{position:relative;border-radius:22px;padding:16px 16px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);overflow:hidden;min-height:150px;display:flex;flex-direction:column}
+.route-line{position:absolute;inset:auto 0 0 0;width:100%;height:58px;opacity:.55}
+.rl-base{fill:none;stroke:rgba(255,255,255,0.14);stroke-width:3;stroke-linecap:round}
+.rl-flow{fill:none;stroke:var(--tc);stroke-width:3;stroke-linecap:round;stroke-dasharray:6 10;animation:flow 1.6s linear infinite}
+.rl-home{fill:#fff}.rl-dest{fill:var(--tc)}
+@keyframes flow{to{stroke-dashoffset:-32}}
+.tone-green{--tc:#5BC98A}.tone-amber{--tc:#F2B544}.tone-red{--tc:#E5675B}.tone-off{--tc:#5B5F68}
+.route-head{display:flex;align-items:center;gap:8px;position:relative}
+.route-ico{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tc) 18%,transparent);color:var(--tc)}
+.route-name{font-size:14px;font-weight:600}
+.route-main{position:relative;margin-top:8px;display:flex;align-items:baseline;gap:4px}
+.route-min{font-size:48px;font-weight:300;letter-spacing:-0.03em;line-height:1;font-variant-numeric:tabular-nums;color:var(--tc)}
+.route-unit{font-size:15px;color:#A3A6AD}
+.route-sub{position:relative;margin:4px 0 0;font-size:12px;color:#A3A6AD}.route-sub b{color:#F2F1EE;font-weight:600}
+.tesla{border-radius:24px;padding:18px 18px 16px;background:linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.10);display:flex;flex-direction:column;gap:14px;flex:1;min-height:0}
+.tesla-top{display:grid;grid-template-columns:1fr 168px;align-items:center;gap:8px}
+.tesla-pct{font-size:52px;font-weight:300;letter-spacing:-0.03em;line-height:1;margin:4px 0;display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums}
+.tesla-pct>span:first-child{font-size:22px;color:#A3A6AD}
+.tesla-chg{white-space:nowrap;margin-left:10px;font-size:12px;font-weight:600;color:#7BE0A6;display:inline-flex;align-items:center;gap:3px;letter-spacing:0}
+.car{width:168px;height:auto;overflow:visible}
+.car-body{fill:rgba(255,255,255,0.06);stroke:rgba(255,255,255,0.35);stroke-width:1.5}
+.car-fill{transition:width 1s ease}
+.car-glass{fill:rgba(10,12,16,0.55);stroke:rgba(255,255,255,0.25);stroke-width:1}
+.car-wheel{fill:#0B0C0E;stroke:rgba(255,255,255,0.45);stroke-width:2}
+.tesla-ctl{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:10px;margin-top:auto}
+.tbtn{height:78px;border-radius:18px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:#E6E7EA}
+.tbtn.on{background:rgba(127,176,255,0.18);border-color:rgba(127,176,255,0.6);color:#BFD6FF;box-shadow:0 0 30px -8px rgba(127,176,255,0.8)}
+.tbtn.on svg{animation:spin 2.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tbtn:disabled,.tround:disabled{opacity:.35}
+.ttemp{display:flex;align-items:center;justify-content:space-between;border-radius:18px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);padding:0 8px}
+.tround{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;color:#F2F1EE}
+.ttemp-v{font-size:24px;font-weight:300;font-variant-numeric:tabular-nums}
+.quote{grid-column:1/-1;margin:0;position:relative;padding:18px 26px 0 70px;border-top:1px solid rgba(255,255,255,0.08)}
+.q-mark{position:absolute;left:14px;top:-6px;font-family:Georgia,"Times New Roman",serif;font-size:96px;line-height:1;background:linear-gradient(180deg,#F2B544,rgba(242,181,68,0.2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.quote blockquote{margin:0;font-family:Georgia,"Iowan Old Style","Times New Roman",serif;font-style:italic;font-size:23px;line-height:1.35;color:#ECEBE7;max-width:980px}
+.quote figcaption{margin-top:6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8A8E97}
+.ev-past{opacity:.38}
+.day-right{padding-top:54px}
+.route{min-height:170px}
+.route-line{inset:12px 12px auto auto;width:96px;height:40px;opacity:.9}
+.tesla-top{grid-template-columns:1fr 220px}
+.car{width:220px}
+.tbar{position:relative;height:10px;border-radius:99px;background:rgba(255,255,255,0.08);overflow:hidden}
+.tbar i{position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:99px;background:linear-gradient(90deg,color-mix(in srgb,var(--bc) 55%,transparent),var(--bc));box-shadow:0 0 16px var(--bc)}
+.tbar b{position:absolute;top:0;bottom:0;width:2px;background:rgba(11,12,14,0.8)}
 .call-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 /* En appel : la vidéo prend tout l'écran, bouton Raccrocher par-dessus. */
 .overlay.incall{background:#000!important;padding:0}
@@ -2260,6 +2545,51 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 @keyframes nudgeDown{0%,100%{transform:none}50%{transform:translateY(5px)}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 `;
+
+
+/* Citations du jour (auteurs du domaine public). */
+const EM_QUOTES = [
+  ['Ce n’est pas parce que les choses sont difficiles que nous n’osons pas, c’est parce que nous n’osons pas qu’elles sont difficiles.', 'Sénèque'],
+  ['La vie, ce n’est pas d’attendre que l’orage passe, c’est d’apprendre à danser sous la pluie.', 'Sénèque (attribué)'],
+  ['Le bonheur de ta vie dépend de la qualité de tes pensées.', 'Marc Aurèle'],
+  ['Fais chaque chose de ta vie comme si elle était la dernière.', 'Marc Aurèle'],
+  ['Ce qui trouble les hommes, ce ne sont pas les choses, mais les jugements qu’ils portent sur les choses.', 'Épictète'],
+  ['Il y a des choses qui dépendent de nous, et d’autres qui n’en dépendent pas.', 'Épictète'],
+  ['Choisis un travail que tu aimes, et tu n’auras pas à travailler un seul jour de ta vie.', 'Confucius (attribué)'],
+  ['Peu importe que tu ailles lentement, pourvu que tu ne t’arrêtes pas.', 'Confucius'],
+  ['Un voyage de mille lieues commence toujours par un premier pas.', 'Lao Tseu'],
+  ['Le sage ne dit pas ce qu’il sait, le sot ne sait pas ce qu’il dit.', 'Lao Tseu (attribué)'],
+  ['Il faut cultiver notre jardin.', 'Voltaire'],
+  ['Le mieux est l’ennemi du bien.', 'Voltaire'],
+  ['Qui veut voyager loin ménage sa monture.', 'Jean Racine'],
+  ['Rien ne sert de courir ; il faut partir à point.', 'Jean de La Fontaine'],
+  ['Patience et longueur de temps font plus que force ni que rage.', 'Jean de La Fontaine'],
+  ['Le cœur a ses raisons que la raison ne connaît point.', 'Blaise Pascal'],
+  ['Je n’ai fait celle-ci plus longue que parce que je n’ai pas eu le loisir de la faire plus courte.', 'Blaise Pascal'],
+  ['Le plus grand faible des hommes, c’est l’amour qu’ils ont de la vie.', 'Molière'],
+  ['À vaincre sans péril, on triomphe sans gloire.', 'Pierre Corneille'],
+  ['Ce que l’on conçoit bien s’énonce clairement.', 'Nicolas Boileau'],
+  ['Vingt fois sur le métier remettez votre ouvrage.', 'Nicolas Boileau'],
+  ['Rien n’est plus puissant qu’une idée dont l’heure est venue.', 'Victor Hugo'],
+  ['Le futur a plusieurs noms : pour les faibles, l’inaccessible ; pour les audacieux, l’opportunité.', 'Victor Hugo (attribué)'],
+  ['Il n’y a qu’un remède à l’amour : aimer davantage.', 'Henry David Thoreau'],
+  ['Va avec confiance dans la direction de tes rêves.', 'Henry David Thoreau'],
+  ['La simplicité est la sophistication suprême.', 'Léonard de Vinci (attribué)'],
+  ['L’imagination est plus importante que le savoir.', 'Albert Einstein'],
+  ['La vie, c’est comme une bicyclette : il faut avancer pour ne pas perdre l’équilibre.', 'Albert Einstein'],
+  ['Le hasard ne favorise que les esprits préparés.', 'Louis Pasteur'],
+  ['Rien n’est permanent, sauf le changement.', 'Héraclite'],
+  ['Connais-toi toi-même.', 'Socrate'],
+  ['Nous sommes ce que nous faisons de manière répétée.', 'Aristote (d’après)'],
+  ['Le commencement est la moitié de tout.', 'Pythagore'],
+  ['Que chacun exerce l’art qu’il connaît.', 'Aristophane'],
+  ['Il n’est point de bonheur sans liberté, ni de liberté sans courage.', 'Périclès'],
+  ['Celui qui déplace une montagne commence par déplacer de petites pierres.', 'Confucius'],
+  ['La persévérance est la noblesse de l’obstination.', 'Proverbe'],
+  ['Le temps est ce que nous voulons le plus et que nous utilisons le plus mal.', 'William Penn'],
+  ['Une journée bien remplie donne un bon sommeil.', 'Léonard de Vinci'],
+  ['Les grandes œuvres ne naissent pas de la force, mais de la persévérance.', 'Samuel Johnson'],
+];
 
 /* Textes secondaires plus clairs en mode léger (écran de tablette moins contrasté). */
 function emLiteCss(css) {
