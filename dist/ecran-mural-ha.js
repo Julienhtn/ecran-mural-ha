@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.5.18';
+const EM_VERSION = '0.5.19';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1610,9 +1610,13 @@ class EcranMuralCard extends HTMLElement {
   async _hangup() {
     this._ringing = false;
     clearTimeout(this._ringTimer);
+    const hadCall = !!this.$.callFrame.querySelector('iframe');
     this.$.callFrame.innerHTML = '';
     this.$.callOv.hidden = true;
     this.$.callOv.classList.remove('incall');
+    // Tablette (Fully Kiosk) : Android garde caméra/micro/mode « appel » après la visio et devient très lent.
+    // Redémarrer l'appli Fully (≈ 5 s) libère tout. Ne concerne que la tablette.
+    if (hadCall && window.fully && typeof window.fully.restartApp === 'function') setTimeout(() => { try { window.fully.restartApp(); } catch (e) { /* noop */ } }, 1500);
 
     for (const t of this._callTargets || []) {
       if (!t.notify) continue;
