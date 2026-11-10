@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.2';
+const EM_VERSION = '0.7.3';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -2374,7 +2374,7 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .tbtn:disabled,.tround:disabled{opacity:.35}
 .ttemp{display:flex;align-items:center;justify-content:space-between;border-radius:20px;border:1px solid var(--line);background:rgba(255,255,255,0.04);padding:0 8px}
 .tround{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;color:#F2F1EE}
-.ttemp-v{font-size:24px;font-weight:300;font-variant-numeric:tabular-nums}
+.ttemp-v{white-space:nowrap;font-size:24px;font-weight:300;font-variant-numeric:tabular-nums}
 .quote{grid-column:1/-1;margin:0;position:relative;padding:16px 26px 0 70px;border-top:1px solid var(--line)}
 .q-mark{position:absolute;left:12px;top:20px;width:40px;height:30px;fill:var(--accent);opacity:.85}
 .quote blockquote{margin:0;font-size:22px;font-weight:300;line-height:1.4;color:#F2F1EE;max-width:980px}
