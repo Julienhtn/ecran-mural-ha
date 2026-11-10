@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.3';
+const EM_VERSION = '0.7.4';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -176,6 +176,9 @@ class EcranMuralCard extends HTMLElement {
     clearInterval(this._hbTimer);
     this._hbTimer = setInterval(() => this._heartbeat(), 60000);
     setTimeout(() => this._heartbeat(), 5000);
+    // Écran éteint (Fully) ou onglet caché : plus aucun rafraîchissement, pour économiser la batterie.
+    this._onVis = () => { if (!document.hidden) { this._tickClock(); this._refreshCams(); } };
+    document.addEventListener('visibilitychange', this._onVis);
     this._onDown = () => { this._last = Date.now(); };
     window.addEventListener('pointerdown', this._onDown, true);
     if (this._ro && this._viewport) this._ro.observe(this._viewport);
@@ -191,9 +194,11 @@ class EcranMuralCard extends HTMLElement {
     if (!this._perf) {
       this._perf = { max: 0, sum: 0, n: 0, last: performance.now() };
       setInterval(() => {
-        const t = performance.now(), lag = Math.max(0, t - this._perf.last - 250);
-        this._perf.last = t; this._perf.max = Math.max(this._perf.max, lag); this._perf.sum += lag; this._perf.n++;
-      }, 250);
+        const t = performance.now(), lag = Math.max(0, t - this._perf.last - 1000);
+        this._perf.last = t;
+        if (document.hidden) return;
+        this._perf.max = Math.max(this._perf.max, lag); this._perf.sum += lag; this._perf.n++;
+      }, 1000);
     }
     const p = this._perf, mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1;
     const dom = this.shadowRoot ? this.shadowRoot.querySelectorAll('*').length : 0;
@@ -876,7 +881,7 @@ class EcranMuralCard extends HTMLElement {
     });
   }
 
-  _refreshCams() { if (this.$ && this.$.callOv && !this.$.callOv.hidden) return; (this._config && this._config.cameras || []).slice(0, 2).forEach((_, i) => this._refreshCam(i)); }
+  _refreshCams() { if (document.hidden) return; if (this.$ && this.$.callOv && !this.$.callOv.hidden) return; (this._config && this._config.cameras || []).slice(0, 2).forEach((_, i) => this._refreshCam(i)); }
 
   /* Image fixe indisponible (ex. Netatmo extérieure) : vignette en direct, coupée pendant la veille. */
   _camFallback(i) {
@@ -929,6 +934,7 @@ class EcranMuralCard extends HTMLElement {
   /* ------------------------------------------------------------------ */
 
   _tickClock() {
+    if (document.hidden) return;
     if (!this.$) return;
     const d = new Date();
     const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
