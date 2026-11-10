@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.4';
+const EM_VERSION = '0.7.5';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -196,7 +196,7 @@ class EcranMuralCard extends HTMLElement {
       setInterval(() => {
         const t = performance.now(), lag = Math.max(0, t - this._perf.last - 1000);
         this._perf.last = t;
-        if (document.hidden) return;
+        if (document.hidden || (this._state && this._state.idle)) return;
         this._perf.max = Math.max(this._perf.max, lag); this._perf.sum += lag; this._perf.n++;
       }, 1000);
     }
@@ -1075,6 +1075,8 @@ class EcranMuralCard extends HTMLElement {
   }
 
   async _loadEnergy() {
+    // En veille ou écran éteint : on reporte au réveil.
+    if (this._state && this._state.idle || document.hidden) { this._energyStale = true; return; }
     const list = (this._config.energy || []).slice(0, 3);
     if (!list.length || !this._hass) { this._renderEnergy(); return; }
     const now = new Date();
@@ -1872,6 +1874,16 @@ class EcranMuralCard extends HTMLElement {
     this.$.idleGlow.style.background = `radial-gradient(circle, ${glow} 0%, transparent 60%)`;
     this.$.idleOv.hidden = false;
     this._stopLiveThumbs();
+    this._idleBrightness(true);
+  }
+
+  /* Tablette : écran de veille = luminosité réduite (économie de batterie), rétablie au réveil. */
+  _idleBrightness(idle) {
+    const h = this._hass, c = this._config || {};
+    const ent = c.brightness_entity || 'number.entree_tablette_luminosite_de_l_ecran';
+    if (!h || !h.user || !/tablette/i.test(h.user.name || '') || !h.states[ent]) return;
+    const v = idle ? (c.idle_brightness != null ? c.idle_brightness : 25) : (c.brightness != null ? c.brightness : 179);
+    h.callService('number', 'set_value', { entity_id: ent, value: v }).catch(() => {});
   }
 
   _wake() {
@@ -1879,7 +1891,9 @@ class EcranMuralCard extends HTMLElement {
     if (!this._state.idle) return;
     this._state.idle = false;
     this.$.idleOv.hidden = true;
+    this._idleBrightness(false);
     this._refreshCams();
+    if (this._energyStale) { this._energyStale = false; this._loadEnergy(); }
   }
 
 
