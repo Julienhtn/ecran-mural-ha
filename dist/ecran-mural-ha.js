@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.1';
+const EM_VERSION = '0.7.2';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1389,6 +1389,7 @@ class EcranMuralCard extends HTMLElement {
     box.hidden = false;
     const num = (e) => { const s = this._st(e); return s && !isNaN(parseFloat(s.state)) ? parseFloat(s.state) : null; };
     const bat = num(t.battery), range = num(t.range);
+    const linked = !!this._st(t.battery) || !!this._st(t.climate);
     const cl = this._st(t.climate);
     const climOn = cl && cl.state && cl.state !== 'off' && cl.state !== 'unavailable';
     const target = cl && cl.attributes.temperature != null ? Number(cl.attributes.temperature) : null;
@@ -1403,7 +1404,7 @@ class EcranMuralCard extends HTMLElement {
       <div class="tesla-top">
         <div><p class="eyebrow">${emEsc(t.name || 'Voiture')}</p>
           <p class="tesla-pct">${bat == null ? '–' : Math.round(bat)}<span>%</span>${charging ? `<span class="tesla-chg">${emIcon('bolt', 16)} en charge</span>` : ''}</p>
-          <p class="muted">${range == null ? 'autonomie –' : `${Math.round(range)} km d’autonomie`}${inside != null ? ` · ${inside}° à bord` : ''}</p></div>
+          <p class="muted">${!linked ? 'Voiture pas encore connectée' : range == null ? 'autonomie –' : `${Math.round(range)} km d’autonomie`}${inside != null ? ` · ${inside}° à bord` : ''}</p></div>
         <svg class="car" viewBox="0 0 240 92" aria-hidden="true">
           <defs><clipPath id="carclip"><path d="M18 62c0-9 6-14 16-16l30-6c14-12 30-20 58-20 26 0 44 8 62 22l26 5c8 2 12 7 12 15v8c0 4-3 6-7 6H25c-4 0-7-2-7-6z"></path></clipPath>
           <linearGradient id="carfill" x1="0" x2="1"><stop offset="0" stop-color="${batCol}" stop-opacity=".55"></stop><stop offset="1" stop-color="${batCol}" stop-opacity=".9"></stop></linearGradient></defs>
@@ -1415,11 +1416,11 @@ class EcranMuralCard extends HTMLElement {
       </div>
       <div class="tbar" style="--p:${pct}%;--bc:${batCol}"><i></i>${[20, 40, 60, 80].map((x) => `<b style="left:${x}%"></b>`).join('')}</div>
       <div class="tesla-ctl">
-        <button class="tbtn press ${climOn ? 'on' : ''}" data-act="tesla" data-a="clim" ${t.climate ? '' : 'disabled'}>${emIcon('fan', 22)}<span>Ventilation</span></button>
-        <button class="tbtn press ${defOn ? 'on' : ''}" data-act="tesla" data-a="defrost" ${t.defrost ? '' : 'disabled'}>${emIcon('snow', 22)}<span>Dégivrage</span></button>
-        <div class="ttemp"><button class="tround press" data-act="tesla" data-a="tm" ${t.climate ? '' : 'disabled'} aria-label="Moins chaud">${emIcon('minus', 18)}</button>
+        <button class="tbtn press ${climOn ? 'on' : ''}" data-act="tesla" data-a="clim" ${this._st(t.climate) ? '' : 'disabled'}>${emIcon('fan', 22)}<span>Ventilation</span></button>
+        <button class="tbtn press ${defOn ? 'on' : ''}" data-act="tesla" data-a="defrost" ${this._st(t.defrost) ? '' : 'disabled'}>${emIcon('snow', 22)}<span>Dégivrage</span></button>
+        <div class="ttemp"><button class="tround press" data-act="tesla" data-a="tm" ${this._st(t.climate) ? '' : 'disabled'} aria-label="Moins chaud">${emIcon('minus', 18)}</button>
           <span class="ttemp-v">${target == null ? '–' : target.toFixed(1).replace('.0', '')}°</span>
-          <button class="tround press" data-act="tesla" data-a="tp" ${t.climate ? '' : 'disabled'} aria-label="Plus chaud">${emIcon('plus', 18)}</button></div>
+          <button class="tround press" data-act="tesla" data-a="tp" ${this._st(t.climate) ? '' : 'disabled'} aria-label="Plus chaud">${emIcon('plus', 18)}</button></div>
       </div>`;
   }
 
