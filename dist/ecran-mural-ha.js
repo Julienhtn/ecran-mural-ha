@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.5';
+const EM_VERSION = '0.7.6';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -626,7 +626,8 @@ class EcranMuralCard extends HTMLElement {
     this._loadWeatherHistory();
     this._loadEnergy();
     clearInterval(this._energyTimer);
-    this._energyTimer = setInterval(() => this._loadEnergy(), 15 * 60 * 1000);
+    // Les compteurs (Linky, Gazpar, Iléo) ne remontent qu'une fois par jour : rechargement toutes les 24 h.
+    this._energyTimer = setInterval(() => this._loadEnergy(), (Number(this._config.energy_refresh_hours) || 24) * 3600 * 1000);
     this._refreshCams();
   }
 
@@ -1077,6 +1078,7 @@ class EcranMuralCard extends HTMLElement {
   async _loadEnergy() {
     // En veille ou écran éteint : on reporte au réveil.
     if (this._state && this._state.idle || document.hidden) { this._energyStale = true; return; }
+    this._energyLoaded = Date.now();
     const list = (this._config.energy || []).slice(0, 3);
     if (!list.length || !this._hass) { this._renderEnergy(); return; }
     const now = new Date();
@@ -1893,7 +1895,8 @@ class EcranMuralCard extends HTMLElement {
     this.$.idleOv.hidden = true;
     this._idleBrightness(false);
     this._refreshCams();
-    if (this._energyStale) { this._energyStale = false; this._loadEnergy(); }
+    const every = (Number(this._config.energy_refresh_hours) || 24) * 3600 * 1000;
+    if (this._energyStale && Date.now() - (this._energyLoaded || 0) > every) { this._energyStale = false; this._loadEnergy(); }
   }
 
 
