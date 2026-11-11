@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.7.6';
+const EM_VERSION = '0.8.0';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -37,6 +37,7 @@ const EM_ICONS = {
   bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"></path>',
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"></path>',
   back: '<path d="M9 6h11v12H9l-6-6 6-6z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path>',
+  gear: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2.2"></circle><circle cx="10" cy="17" r="2.2"></circle>',
   hangup: '<path d="M3 15c5-4.5 13-4.5 18 0l-2.5 2.5-3.5-1.5v-2.5c-2-.7-4-.7-6 0V16l-3.5 1.5z"></path>'
 };
 
@@ -91,7 +92,8 @@ const EM_DEFAULT_CONFIG = {
   thermostat: null,
   tempo: null,
   energy: [],
-  call: null
+  call: null,
+  theme: 'nuit'
 };
 
 class EcranMuralCard extends HTMLElement {
@@ -290,7 +292,7 @@ class EcranMuralCard extends HTMLElement {
       </button>` : '');
 
     const lite = this._lite = c.lite === true || (c.lite !== false && (/Android/i.test(navigator.userAgent) || /[?&]lite\b/.test(location.search)));
-    this.shadowRoot.innerHTML = `<style>${lite ? emLiteCss(EM_CSS) + EM_LITE_CSS : EM_CSS}</style>
+    this.shadowRoot.innerHTML = `<style data-ref="css"></style>
 <div class="viewport" data-ref="viewport">
  <div class="stage" data-ref="stage" style="--accent:${emEsc(c.accent)}">
   <div class="bg" aria-hidden="true">
@@ -309,7 +311,7 @@ class EcranMuralCard extends HTMLElement {
           </div>
         </div>
         <p class="time time-btn" data-ref="time" data-act="day" role="button" aria-label="Ma journée" aria-live="off"></p>
-        <div class="outdoor">${emIcon('thermo', 17, '#F2B544')}<span class="outdoor-t" data-ref="outT">–</span><span class="muted small" data-ref="outF">Extérieur</span></div>
+        <div class="outdoor">${emIcon('thermo', 17, '#F2B544')}<span class="outdoor-t" data-ref="outT">–</span><span class="muted small" data-ref="outF">Extérieur</span><button class="sq sq-set press" data-act="settings" aria-label="Réglages">${emIcon('gear', 18, 'currentColor', 1.8)}</button></div>
       </section>
 
       <section class="card weather">
@@ -508,6 +510,25 @@ class EcranMuralCard extends HTMLElement {
     </div>
   </div>
 
+  <div class="overlay" data-ref="setOv" hidden>
+    <div class="dialog setbox" role="dialog" aria-modal="true" aria-label="Réglages">
+      <button class="xbtn press" data-act="closeset" aria-label="Fermer">${emIcon('close', 20, 'currentColor', 2)}</button>
+      <p class="eyebrow">Réglages</p>
+      <h2 class="big">Apparence</h2>
+      <p class="muted lg">Le choix est gardé sur cet appareil.</p>
+      <div class="theme-grid">
+        <button class="theme-pick press" data-act="theme" data-t="nuit" data-ref="thNuit">
+          <span class="th-prev th-nuit" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <b>Nuit</b><span>Verre dépoli et lueurs selon l’heure</span>
+        </button>
+        <button class="theme-pick press" data-act="theme" data-t="editorial" data-ref="thEd">
+          <span class="th-prev th-ed" aria-hidden="true"><i>11:07</i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <b>Éditorial</b><span>Aplats colorés et grande typographie</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <button class="idle" data-ref="idleOv" data-act="wake" aria-label="Réveiller l’écran" hidden>
     <span class="idle-glow" data-ref="idleGlow" aria-hidden="true"></span>
     <span class="idle-in">
@@ -552,8 +573,34 @@ class EcranMuralCard extends HTMLElement {
     try { savedTab = localStorage.getItem('ecran-mural-tab') || 'maison'; } catch (e) { /* noop */ }
     this._setTab(savedTab, true);
     this._buildTicks();
+    this._applyTheme();
     this._built = true;
     this._tickClock();
+  }
+
+  /* Thème : « nuit » (verre dépoli) ou « editorial » (aplats colorés). Choix gardé par appareil. */
+  _theme() {
+    let t = null;
+    try { t = localStorage.getItem('ecran-mural-theme'); } catch (e) { /* noop */ }
+    t = t || this._config.theme || 'nuit';
+    return t === 'editorial' ? 'editorial' : 'nuit';
+  }
+
+  _applyTheme() {
+    const ed = this._theme() === 'editorial';
+    if (ed) emLoadFonts();
+    const base = this._lite ? emLiteCss(EM_CSS) + EM_LITE_CSS : EM_CSS;
+    const css = base + (ed ? EM_ED_CSS : '');
+    if (this.$.css.textContent !== css) this.$.css.textContent = css;
+    this.$.viewport.classList.toggle('ed', ed);
+    this.$.thNuit.classList.toggle('on', !ed);
+    this.$.thEd.classList.toggle('on', ed);
+    if (this._built && this._hass) { this._updateTempo(); this._renderWeather(); }
+  }
+
+  _setTheme(t) {
+    try { localStorage.setItem('ecran-mural-theme', t); } catch (e) { /* noop */ }
+    this._applyTheme();
   }
 
   _buildTicks() {
@@ -703,6 +750,7 @@ class EcranMuralCard extends HTMLElement {
   _updateAlarm() {
     const a = this._alarmInfo();
     const b = this.$.alarmBtn;
+    this.$.stage.dataset.alarm = a.state;
     b.style.background = a.bg;
     b.style.borderColor = a.border;
     b.style.color = a.fg;
@@ -835,6 +883,12 @@ class EcranMuralCard extends HTMLElement {
 
   _tempoColor(v) {
     const s = String(v || '').toLowerCase();
+    if (this._theme() === 'editorial') {
+      if (/bleu|blue/.test(s)) return ['Bleu', '#2F2DB8', '#2F2DB8', '#FFFFFF', '#FFFFFF'];
+      if (/blanc|white/.test(s)) return ['Blanc', '#EFE8CF', '#EFE8CF', '#11131A', '#11131A'];
+      if (/rouge|red/.test(s)) return ['Rouge', '#E5484D', '#E5484D', '#FFFFFF', '#FFFFFF'];
+      return ['–', 'rgba(255,255,255,0.05)', 'transparent', '#A2A8BF', '#5B6178'];
+    }
     if (/bleu|blue/.test(s)) return ['Bleu', 'rgba(76,128,255,0.12)', 'rgba(76,128,255,0.35)', '#A9C3FF', '#4C80FF'];
     if (/blanc|white/.test(s)) return ['Blanc', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.30)', '#F2F1EE', '#F2F1EE'];
     if (/rouge|red/.test(s)) return ['Rouge', 'rgba(229,72,77,0.11)', 'rgba(229,72,77,0.35)', '#FF9EA1', '#E5484D'];
@@ -850,10 +904,11 @@ class EcranMuralCard extends HTMLElement {
       tile.style.background = c[1];
       tile.style.borderColor = c[2];
       tile.style.color = c[3];
-      tile.style.boxShadow = c[0] === '–' ? 'none' : `0 0 30px -12px ${c[4]}`;
+      const ed = this._theme() === 'editorial';
+      tile.style.boxShadow = c[0] === '–' || ed ? 'none' : `0 0 30px -12px ${c[4]}`;
       const dot = tile.querySelector('.tdot');
       dot.style.background = c[4];
-      dot.style.boxShadow = c[0] === '–' ? 'none' : `0 0 10px ${c[4]}`;
+      dot.style.boxShadow = c[0] === '–' || ed ? 'none' : `0 0 10px ${c[4]}`;
       this.$['tempo' + i + 'v'].textContent = c[0];
     });
   }
@@ -1267,6 +1322,9 @@ class EcranMuralCard extends HTMLElement {
       case 'hangup': this._hangup(); break;
       case 'day': this._openDay(); break;
       case 'closeday': this._closeDay(); break;
+      case 'settings': this.$.setOv.hidden = false; break;
+      case 'closeset': this.$.setOv.hidden = true; break;
+      case 'theme': this._setTheme(el.dataset.t); setTimeout(() => { if (this.$) this.$.setOv.hidden = true; }, 350); break;
       case 'tesla': this._teslaAct(el.dataset.a); break;
       default: break;
     }
@@ -2431,6 +2489,35 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .idle-alarm{margin-top:28px;display:inline-flex;align-items:center;gap:10px;padding:9px 16px;border-radius:999px;background:rgba(255,255,255,0.05);font-size:15px}
 .idle-alarm .dot{width:8px;height:8px}
 
+.sq-set{margin-left:auto;width:36px;height:36px;border-radius:11px}
+.setbox{width:880px;height:auto;padding:48px;display:flex;flex-direction:column;gap:10px}
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:20px}
+.theme-pick{border-radius:28px;padding:14px 14px 18px;border:2px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:4px;text-align:left}
+.theme-pick.on{border-color:var(--accent);box-shadow:0 0 40px -14px var(--accent)}
+.theme-pick b{font-size:22px;font-weight:500;margin:12px 4px 0}
+.theme-pick > span:last-child{font-size:14px;color:#A3A6AD;margin:0 4px}
+.th-prev{height:200px;border-radius:18px;padding:10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;overflow:hidden}
+.th-prev i{border-radius:9px;font-style:normal}
+.th-prev i:nth-child(1){grid-column:1;grid-row:1}
+.th-prev i:nth-child(2){grid-column:2/4;grid-row:1}
+.th-prev i:nth-child(3){grid-column:4;grid-row:1/3}
+.th-prev i:nth-child(4){grid-column:1;grid-row:2/4}
+.th-prev i:nth-child(5){grid-column:2;grid-row:2}
+.th-prev i:nth-child(6){grid-column:3;grid-row:2}
+.th-prev i:nth-child(7){grid-column:2/5;grid-row:3}
+.th-nuit{background:radial-gradient(circle at 15% 90%,rgba(242,150,60,0.35),transparent 55%),radial-gradient(circle at 90% 0%,rgba(60,80,200,0.5),transparent 55%),#05070E}
+.th-nuit i{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12)}
+.th-nuit i:nth-child(2){background:rgba(61,214,140,0.10);border-color:rgba(61,214,140,0.35)}
+.th-ed{background:#0A0F1F}
+.th-ed i{background:#151C33}
+.th-ed i:nth-child(1){background:#EFE8CF;color:#11131A;font:900 20px/1 Fraunces,Georgia,serif;display:flex;align-items:flex-end;padding:6px}
+.th-ed i:nth-child(2){background:#3FCB86}
+.th-ed i:nth-child(4){background:#2F2DB8}
+.th-ed i:nth-child(5){background:#F2A93B}
+.th-ed i:nth-child(6){background:#F2A93B}
+.mobile .setbox{padding:24px 20px}
+.mobile .theme-grid{grid-template-columns:1fr;gap:12px}
+.mobile .th-prev{height:140px}
 .toast{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);z-index:40;padding:12px 18px;border-radius:14px;background:rgba(20,22,27,0.92);border:1px solid rgba(255,255,255,0.12);font-size:14px;animation:rise .3s ease}
 
 /* ---------- Téléphone : une colonne, défilement naturel ---------- */
@@ -2633,6 +2720,171 @@ const EM_LITE_CSS = `
 .dialog{background:#15171B!important;border-color:rgba(255,255,255,0.14)!important}
 .pill-ghost{background:#24272E!important}
 .tabbar{background:#0C0D10!important}
+`;
+
+/* Polices du thème éditorial (chargées une seule fois, dans la page : nécessaire pour le Shadow DOM). */
+function emLoadFonts() {
+  if (document.getElementById('em-ed-fonts')) return;
+  const l = document.createElement('link');
+  l.id = 'em-ed-fonts';
+  l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500&display=swap';
+  document.head.appendChild(l);
+}
+
+/* Thème « éditorial » : aplats colorés, grande serif pour les titres, chiffres en mono, aucun flou. */
+const EM_ED_CSS = `
+.viewport.ed{background:#0A0F1F!important}
+.ed .stage{--ed-bg:#0A0F1F;--ed-card:#141B31;--ed-card2:#1C2441;--ed-cream:#EFE8CF;--ed-ink:#11131A;--ed-indigo:#2F2DB8;--ed-amber:#F2A93B;--ed-coral:#EE5B3B;--ed-green:#3FCB86;--ed-red:#E5484D;--ed-text:#F3EFE3;--ed-mut:#A8AEC4;--ed-faint:#7F87A2;
+  --serif:Fraunces,"DM Serif Display",Georgia,serif;--mono:"JetBrains Mono","Geist Mono",ui-monospace,monospace;--sans:Archivo,Inter,system-ui,sans-serif;
+  --accent:#F2A93B!important;--glass:var(--ed-card)!important;--line:transparent!important;
+  background:var(--ed-bg)!important;color:var(--ed-text);font-family:var(--sans)}
+.ed .bg,.ed .halo,.ed .thermo-glow,.ed .idle-glow{display:none!important}
+.ed *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.ed .grid{gap:14px;padding:22px}
+.ed .col{gap:14px}
+.ed .cams,.ed .scenes{gap:14px}
+.ed .card,.ed .scene,.ed .route,.ed .tesla,.ed .cam{background:var(--ed-card)!important;border:0!important;box-shadow:none!important;border-radius:20px}
+.ed h2,.ed h3,.ed .eyebrow{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ed-mut)}
+.ed .muted{color:var(--ed-mut)}.ed .faint{color:var(--ed-faint)}
+.ed .warm{color:var(--ed-amber)}.ed .cool{color:#9FB1FF}
+.ed .svgt,.ed .axis,.ed .eb,.ed .j-time,.ed .cam-time{font-family:var(--mono)}
+
+/* Horloge : grand aplat crème */
+.ed .clock{background:var(--ed-cream)!important;color:var(--ed-ink)}
+.ed .clock .muted{color:#6A6450}
+.ed .clock-head p{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.ed .time{font-family:var(--serif);font-weight:900;font-size:100px;letter-spacing:-0.035em;margin-top:22px;font-variation-settings:"opsz" 144}
+.ed .time .odo-c{opacity:1;margin:0 -0.02em}
+.ed .clock .sq{background:rgba(17,19,26,0.08);border-color:transparent;color:var(--ed-ink)}
+.ed .clock .sq-green{background:#1E7A4C;color:#FFFFFF}
+.ed .outdoor{border-top:1.5px solid rgba(17,19,26,0.14)}
+.ed .outdoor > svg{stroke:#C2551F}
+.ed .outdoor-t{font-family:var(--mono);font-weight:500;font-size:19px;letter-spacing:-0.02em}
+
+/* Météo : bloc indigo */
+.ed .weather{background:var(--ed-indigo)!important;color:#FFFFFF}
+.ed .weather h2,.ed .weather h3{color:rgba(255,255,255,0.78)}
+.ed .weather .warm{color:#FFC86B}.ed .weather .cool{color:#FFFFFF}
+.ed .weather .svgt{fill:rgba(255,255,255,0.75)}
+.ed .weather .axis{color:rgba(255,255,255,0.7)}
+.ed .weather circle[fill="#7FB0FF"],.ed .weather text[fill="#7FB0FF"]{fill:#FFFFFF}
+.ed .weather polyline[stroke="#F2B544"]{stroke:#FFC86B}
+.ed .weather circle[fill="#F2B544"],.ed .weather text[fill="#F2B544"]{fill:#FFC86B}
+.ed .rain span{background:rgba(255,255,255,0.16)!important;border-radius:2px}
+.ed .rain span[style*="#7FB0FF"]{background:#FFFFFF!important}
+
+/* Tempo */
+.ed .tempo-tile{border-radius:14px}
+.ed .tempo-tile .muted{color:inherit;opacity:.75}
+.ed .tempo-v{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:-0.01em}
+
+/* Alarme : la carte entière prend la couleur de l'état */
+.ed .alarm{border-radius:22px;transition:background .6s ease,color .6s ease}
+.ed .alarm-info h1{font-family:var(--serif);font-weight:900;font-size:62px;letter-spacing:-0.025em;line-height:.98;color:inherit!important;font-variation-settings:"opsz" 144}
+.ed .alarm-info .eyebrow,.ed .alarm-info .muted{color:inherit;opacity:.72}
+.ed .alarm-btn{box-shadow:none!important;border-width:0!important}
+.ed .alarm-action{font-family:var(--sans);font-weight:800;letter-spacing:.02em}
+.ed .ring{border-color:currentColor!important;opacity:.6}
+.ed .chip{background:rgba(255,255,255,0.08);color:inherit;font-weight:600}
+.ed .chip-open{background:var(--ed-coral);color:#FFFFFF}
+.ed .counting [data-ref="alarmAction"]{font-family:var(--mono);font-weight:500}
+.ed .stage[data-alarm="disarmed"] .alarm-btn{background:var(--ed-green)!important;color:#07281A!important}
+.ed .stage[data-alarm="armed_away"] .alarm,.ed .stage[data-alarm="armed_vacation"] .alarm{background:var(--ed-coral)!important;color:#1D0A05}
+.ed .stage[data-alarm="armed_away"] .alarm-btn,.ed .stage[data-alarm="armed_vacation"] .alarm-btn{background:#1D0A05!important;color:var(--ed-coral)!important}
+.ed .stage[data-alarm="armed_night"] .alarm,.ed .stage[data-alarm="armed_home"] .alarm{background:var(--ed-indigo)!important;color:#FFFFFF}
+.ed .stage[data-alarm="armed_night"] .alarm-btn,.ed .stage[data-alarm="armed_home"] .alarm-btn{background:var(--ed-cream)!important;color:var(--ed-indigo)!important}
+.ed .stage[data-alarm="arming"] .alarm,.ed .stage[data-alarm="pending"] .alarm{background:var(--ed-amber)!important;color:var(--ed-ink)}
+.ed .stage[data-alarm="arming"] .alarm-btn,.ed .stage[data-alarm="pending"] .alarm-btn{background:var(--ed-ink)!important;color:var(--ed-amber)!important}
+.ed .stage[data-alarm="triggered"] .alarm{background:var(--ed-red)!important;color:#FFFFFF}
+.ed .stage[data-alarm="triggered"] .alarm-btn{background:#FFFFFF!important;color:var(--ed-red)!important}
+.ed .stage:not([data-alarm="disarmed"]):not([data-alarm="unavailable"]) .alarm .chip{background:rgba(0,0,0,0.14)}
+
+/* Caméras */
+.ed .cam{background:#05070E!important}
+.ed .cam-tag{background:rgba(10,15,31,0.75);font-family:var(--sans);font-weight:700;letter-spacing:.1em}
+.ed .cam-label b{font-weight:700}
+
+/* Scènes : tuile active en aplat ambre */
+.ed .scene{color:var(--ed-mut)}
+.ed .scene b{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ed-text)}
+.ed .scene-on{background:var(--ed-amber)!important;color:var(--ed-ink)!important}
+.ed .scene-on b,.ed .scene-on span span{color:var(--ed-ink)}
+
+/* Volets */
+.ed .cv-pill{background:var(--ed-card2);border:0;box-shadow:none;border-radius:16px}
+.ed .cv-btn{color:var(--ed-text)}
+.ed .cv-sep{background:rgba(255,255,255,0.08)}
+.ed .cv-on-up{background:var(--ed-amber);color:var(--ed-ink)}
+.ed .cv-on-down{background:var(--ed-indigo);color:#FFFFFF}
+.ed .cv-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+
+/* Thermostat */
+.ed .arc{filter:none}
+.ed .setp{font-family:var(--mono);font-weight:500;font-size:44px;letter-spacing:-0.05em}
+.ed .chip-s{font-weight:600}
+.ed .chip-warm{background:var(--ed-amber);color:var(--ed-ink)}
+.ed .thermo-btns .tbtn{border:0;box-shadow:none!important;border-radius:16px}
+.ed .thermo-btns .tbtn-cool{background:var(--ed-indigo);color:#FFFFFF}
+.ed .thermo-btns .tbtn-hot{background:var(--ed-amber);color:var(--ed-ink)}
+
+/* Consommations */
+.ed .en-cost,.ed .en-total{font-family:var(--mono);font-weight:500;letter-spacing:-0.04em}
+.ed .en-ico{box-shadow:none!important}
+.ed .seg{background:var(--ed-card2)}
+.ed .seg button{font-weight:600}
+.ed .seg button.on{background:var(--ed-cream);color:var(--ed-ink)}
+
+/* Fenêtres */
+.ed .overlay{background:rgba(6,9,20,0.9)!important}
+.ed .dialog{background:#10162B!important;border:0!important;box-shadow:none!important;border-radius:30px}
+.ed .camfull{background:#05070E!important}
+.ed .xbtn{background:var(--ed-card2);border:0}
+.ed h2.big,.ed .camfull-title{font-family:var(--serif);font-weight:900;font-size:56px;letter-spacing:-0.025em;text-transform:none;color:var(--ed-text)}
+.ed .camfull-title{font-size:38px}
+.ed .mode{border:0;background:var(--ed-card2);font-weight:700}
+.ed .mode.on{background:var(--ed-cream);color:var(--ed-ink)}
+.ed .key{border:0;background:var(--ed-card2);box-shadow:none;font-family:var(--mono);font-weight:400;font-size:36px}
+.ed .key-ghost{background:transparent}.ed .key-small{font-family:var(--sans);font-weight:600}
+.ed .pin-dot{border-color:var(--ed-cream)}
+.ed .pin-dot.on{background:var(--ed-cream);box-shadow:none}
+.ed .arm-tile{border:0;box-shadow:none}
+.ed .arm-night{background:var(--ed-indigo);color:#FFFFFF}
+.ed .arm-away{background:var(--ed-coral);color:#1D0A05}
+.ed .arm-ico{background:rgba(255,255,255,0.14)!important;box-shadow:none!important}
+.ed .arm-away .arm-ico{background:rgba(0,0,0,0.12)!important}
+.ed .arm-name{font-family:var(--serif);font-weight:900;font-size:40px;color:inherit}
+.ed .arm-sub{color:inherit;opacity:.75}
+.ed .call-target{border:0;background:var(--ed-card2)}
+.ed .call-target b{font-family:var(--serif);font-weight:800}
+.ed .pill-ghost{border:0;background:var(--ed-card2)!important}
+.ed .ringing{background:var(--ed-amber);color:var(--ed-ink)}
+.ed .theme-pick{border-color:transparent;background:var(--ed-card2)}
+.ed .theme-pick.on{border-color:var(--ed-amber);box-shadow:none}
+.ed .theme-pick b{font-family:var(--serif);font-weight:800}
+
+/* Ma journée */
+.ed h2.day-hello{font-family:var(--serif);font-weight:800;font-size:48px;letter-spacing:-0.02em;text-transform:none;color:var(--ed-text)}
+.ed .day-hello em{color:var(--ed-amber);font-weight:900}
+.ed .route,.ed .tesla{background:var(--ed-card2)!important}
+.ed .route-min,.ed .tesla-pct{font-family:var(--mono);font-weight:500;letter-spacing:-0.05em}
+.ed .ev-time span{font-family:var(--mono)}
+.ed .quote blockquote{font-family:var(--serif);font-weight:600;font-style:italic}
+
+/* Téléphone */
+.ed .tabbar{background:var(--ed-bg)!important;border-top:0}
+.ed h2.sec-title{font-family:var(--serif);font-weight:900;font-size:34px;text-transform:none;letter-spacing:-0.02em}
+.ed .sec-mode,.ed .door,.ed .tool,.ed .j-more{border:0;background:var(--ed-card2)}
+.ed .sec-mode.on{background:var(--ed-cream);color:var(--ed-ink)}
+.ed.mobile .clock .time{font-size:64px}
+.ed.mobile .alarm-info h1{font-size:38px}
+
+/* Écran de veille */
+.ed .idle{background:#0A0F1F}
+.ed .idle-time{font-family:var(--serif);font-weight:900;font-size:230px;letter-spacing:-0.04em;color:var(--ed-cream)}
+.ed .idle-date{font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ed-mut)}
+.ed .idle-alarm{background:var(--ed-card);font-weight:600}
+.ed .toast{background:var(--ed-cream);color:var(--ed-ink);border:0;font-weight:600}
 `;
 
 if (!customElements.get('ecran-mural-card')) {
