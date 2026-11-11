@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.8.0';
+const EM_VERSION = '0.8.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -133,7 +133,7 @@ class EcranMuralCard extends HTMLElement {
     const [type, ts, ...rest] = String(s.state).split('|');
     if (!ts || Math.abs(Date.now() / 1000 - Number(ts)) > 90) return;
     const texte = rest.join('|');
-    if (type === 'sonnette' && this._config.doorbell_camera) this._doorbell();
+    if (type === 'sonnette' && this._config.doorbell_camera) this._doorbell(/^https:\/\//.test(texte) ? texte : '');
     else if (type === 'visage') this._showVisitor(texte);
     else if (type === 'decroche') { this._ringing = false; clearTimeout(this._ringTimer); if (this.$ && this.$.callText && !this.$.callOv.hidden) this.$.callText.textContent = 'En ligne'; }
   }
@@ -1315,6 +1315,7 @@ class EcranMuralCard extends HTMLElement {
       case 'period': this._state.period = el.dataset.p; this._renderEnergy(); break;
       case 'cam': this._openCam(Number(i), false); break;
       case 'closecam': this._closeCam(); break;
+      case 'camlive': this._openCam(Number(i), this.$.camRing && !this.$.camRing.hidden); break;
       case 'sleep': this._sleep(); break;
       case 'wake': this._wake(); break;
       case 'call': this._openCall(); break;
@@ -1706,12 +1707,14 @@ class EcranMuralCard extends HTMLElement {
   }
 
   /* Sonnette : ouvre la caméra en grand, fait sonner l'écran, affiche qui est là. */
-  _doorbell() {
+  /* snap : photo prise par la sonnette au moment de l'appui (transmise par l'automatisation).
+     Netatmo prévient Home Assistant avec 20 à 30 s de retard : l'image en direct ne montre souvent plus personne. */
+  _doorbell(snap) {
     const now = Date.now();
     if (this._lastRing && now - this._lastRing < 20000) return;
     this._lastRing = now;
     this._visitor = '';
-    this._openCam(this._camIndex(this._config.doorbell_camera), true);
+    this._openCam(this._camIndex(this._config.doorbell_camera), true, snap);
     this._ringDing();
   }
 
@@ -1736,16 +1739,30 @@ class EcranMuralCard extends HTMLElement {
   }
 
   /* Caméras */
-  _openCam(i, ringing) {
+  _openCam(i, ringing, snap) {
     const cam = (this._config.cameras || [])[i];
     if (!cam) return;
     const s = this._st(cam.entity);
     this._state.cam = i;
     this.$.camTitle.textContent = cam.name || '';
-    this.$.camSub.textContent = ringing ? 'Analyse du visiteur…' : (cam.sub || '');
+    if (!this._visitor) this.$.camSub.textContent = ringing ? 'Analyse du visiteur…' : (cam.sub || '');
     this.$.camRing.hidden = !ringing;
     const media = this.$.camMedia;
+    clearInterval(this._fullCamTimer);
+    media.querySelectorAll('video').forEach((v) => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* noop */ } });
     media.innerHTML = '';
+    if (snap) {
+      // Photo de l'appui, fixe ; le direct seulement à la demande.
+      const u = emEsc(snap);
+      media.innerHTML = `<div class="camfull-blur" style="background-image:url('${u}')"></div><img class="stream still" src="${u}" alt="Photo prise au moment de l’appui">
+        <span class="snap-tag">Photo prise à l’appui</span>
+        <button class="pill pill-ghost snap-live press" data-act="camlive" data-i="${i}">${emIcon('video', 20, 'currentColor', 1.8)}Voir le direct</button>`;
+      const im = media.querySelector('img.still');
+      im.onerror = () => { if (!this.$.camOv.hidden && this._state.cam === i) this._openCam(i, ringing); };
+      this._wake();
+      this.$.camOv.hidden = false;
+      return;
+    }
     if (s && s.attributes.entity_picture) {
       // Direct vidéo seulement si la caméra le permet (la sonnette Netatmo n'a qu'une image fixe).
       const vpn = s.attributes.vpn_url;
@@ -1792,6 +1809,7 @@ class EcranMuralCard extends HTMLElement {
   }
 
   _closeCam() {
+    this._visitor = '';
     clearInterval(this._fullCamTimer);
     this.$.camMedia.querySelectorAll('video').forEach((v) => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { /* noop */ } });
     clearTimeout(this._dingTimer);
@@ -2383,6 +2401,8 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .camfull-actions{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);display:flex;gap:12px}
 .pill{height:56px;padding:0 26px;border-radius:999px;font-size:16px;font-weight:600;display:inline-flex;align-items:center;gap:10px}
 .pill-ghost{border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.08);backdrop-filter:blur(12px)}
+.snap-tag{position:absolute;left:28px;bottom:32px;padding:8px 14px;border-radius:999px;background:rgba(0,0,0,0.55);color:#F2F1EE;font-size:14px;font-weight:600}
+.snap-live{position:absolute;right:28px;bottom:28px;z-index:2}
 .pill-red{border:0;background:#D93A3F;color:#FFFFFF;box-shadow:0 0 40px -10px #D93A3F}
 
 .callbox{display:flex;flex-direction:column;gap:20px}
