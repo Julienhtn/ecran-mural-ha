@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.8.1';
+const EM_VERSION = '0.8.2';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -68,6 +68,17 @@ function emWeatherIcon(cond, h) {
     default: body = cloud('#8A8E97');
   }
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+
+/* « mouvement entrée », « ouverture porte d’entrée », « manipulation fenêtre du dressing »… */
+function emSensorLabel(st, id) {
+  const a = (st && st.attributes) || {};
+  const dc = a.device_class || '';
+  const kind = dc === 'motion' || dc === 'occupancy' || dc === 'presence' ? 'mouvement' : dc === 'tamper' ? 'manipulation' : 'ouverture';
+  let place = String(a.friendly_name || id || '').replace(/hue (outdoor |indoor )?motion sensor \d*/i, '')
+    .replace(/\b(mouvement|ouverture|manipulation|motion|contact|capteur)\b/gi, '').replace(/\s+/g, ' ').trim();
+  if (!place) place = String(id || '').replace(/^binary_sensor\./, '').replace(/_/g, ' ');
+  return `${kind} ${place.charAt(0).toLowerCase()}${place.slice(1)}`;
 }
 
 function emFr(n, d) {
@@ -2113,10 +2124,32 @@ class EcranMuralCard extends HTMLElement {
     let evs = [];
     try { evs = await this._hass.callWS({ type: 'logbook/get_events', start_time: start, end_time: new Date().toISOString() }); } catch (e) { evs = []; }
     const alarmTxt = { disarmed: ['Alarme désarmée', 'ok'], armed_away: ['Alarme armée · Absent', 'arm'], armed_night: ['Alarme armée · Nuit', 'night'], armed_home: ['Alarme armée · Présence', 'night'], armed_vacation: ['Alarme armée · Vacances', 'arm'], arming: ['Armement en cours', 'warn'], pending: ['Ouverture détectée · délai d’entrée', 'warn'], triggered: ['ALARME DÉCLENCHÉE', 'alert'] };
+    // Capteurs de l'alarme (liste Alarmo si accessible, sinon tout capteur d'ouverture / mouvement / manipulation).
+    if (!this._alarmSensors) {
+      try { const r = await this._hass.callWS({ type: 'alarmo/sensors' }); this._alarmSensors = Object.keys(r || {}); } catch (e) { this._alarmSensors = []; }
+    }
+    const watched = new Set(this._alarmSensors.length ? this._alarmSensors : Object.keys(this._hass.states).filter((id) => id.startsWith('binary_sensor.')
+      && ['motion', 'opening', 'door', 'window', 'garage_door', 'tamper'].includes((this._hass.states[id].attributes || {}).device_class)));
+    doors.forEach((d) => watched.add(d.entity));
+    const recentOn = [];
+    let cause = null;
     const out = [];
     (evs || []).forEach((e) => {
       const t = (e.when || 0) * 1000;
-      if (e.entity_id === c.alarm && alarmTxt[e.state]) out.push({ t, txt: alarmTxt[e.state][0], kind: alarmTxt[e.state][1] });
+      if (watched.has(e.entity_id) && e.state === 'on') recentOn.push({ t, id: e.entity_id });
+      if (e.entity_id === c.alarm && alarmTxt[e.state]) {
+        let txt = alarmTxt[e.state][0];
+        if (e.state === 'pending' || e.state === 'triggered') {
+          // Capteur responsable : le dernier déclenché juste avant (ou celui du délai d'entrée).
+          const hit = recentOn.filter((x) => x.t <= t + 500 && x.t >= t - 60000).pop();
+          if (hit) cause = { id: hit.id, t };
+          else if (!(e.state === 'triggered' && cause && t - cause.t < 600000)) cause = null;
+          const lbl = !cause ? '' : !this._hass.states[cause.id] && doorName[cause.id] ? `ouverture ${doorName[cause.id].toLowerCase()}` : emSensorLabel(this._hass.states[cause.id], cause.id);
+          if (e.state === 'pending') txt = lbl ? `Délai d’entrée · détection par ${lbl}` : 'Détection · délai d’entrée';
+          else txt = lbl ? `ALARME · intrusion détectée par ${lbl}` : alarmTxt.triggered[0];
+        } else cause = null;
+        out.push({ t, txt, kind: alarmTxt[e.state][1] });
+      }
       else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) out.push({ t, txt: `${doorName[e.entity_id]} · ${e.state === 'on' ? 'ouverture' : 'fermeture'}`, kind: e.state === 'on' ? 'door' : 'door-off' });
       else if (e.domain === 'ecran_mural' || (e.name === 'Caméra' && e.message)) out.push({ t, txt: e.message.charAt(0).toUpperCase() + e.message.slice(1), kind: 'cam' });
     });
