@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.9.0';
+const EM_VERSION = '0.9.1';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -986,7 +986,7 @@ class EcranMuralCard extends HTMLElement {
       jour: ['#0C1017', 'rgba(242,181,68,0.18)', 'rgba(100,170,255,0.34)', 'rgba(80,200,190,0.14)'],
       soir: ['#0A0910', 'rgba(255,120,70,0.30)', 'rgba(130,80,210,0.30)', 'rgba(242,181,68,0.16)']
     }[this._moment()];
-    const sc0 = (this._config.scenes || [])[this._state.scene];
+    const sc0 = (this._config.scenes || [])[this._activeScene()];
     const key = this._moment() + '|' + (sc0 && sc0.tint || '');
     if (this._momentKey === key) return;
     this._momentKey = key;
@@ -995,7 +995,7 @@ class EcranMuralCard extends HTMLElement {
     this.$.b1.style.background = `radial-gradient(circle, ${pal[1]} 0%, transparent 62%)`;
     this.$.b2.style.background = `radial-gradient(circle, ${pal[2]} 0%, transparent 62%)`;
     this.$.b3.style.background = `radial-gradient(circle, ${pal[3]} 0%, transparent 65%)`;
-    const sc = (this._config.scenes || [])[this._state.scene];
+    const sc = (this._config.scenes || [])[this._activeScene()];
     const tint = sc && sc.tint ? sc.tint : 'transparent';
     this.$.tint.style.background = tint;
   }
@@ -1186,7 +1186,7 @@ class EcranMuralCard extends HTMLElement {
     (this._config.scenes || []).slice(0, 3).forEach((s, i) => {
       const el = this.$['scene' + i];
       if (!el) return;
-      const on = this._state.scene === i;
+      const on = this._activeScene() === i;
       el.classList.toggle('scene-on', on);
       el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
@@ -1905,15 +1905,48 @@ class EcranMuralCard extends HTMLElement {
     if (!sc) return;
     const [domain, service] = String(sc.service || 'scene.turn_on').split('.');
     this._call(domain, service, Object.assign({}, sc.data || {}, sc.target ? { entity_id: sc.target } : {}));
-    this._state.scene = i;
-    try { localStorage.setItem('ecran-mural-scene', String(i)); } catch (e) { /* noop */ }
+    // Allumage immédiat du bouton, en attendant le retour d'état réel des lumières (quelques secondes au plus).
+    this._sceneTap = { i, until: Date.now() + 6000 };
+    clearTimeout(this._sceneTapTimer);
+    this._sceneTapTimer = setTimeout(() => { this._updateScenes(); this._updateMoment(); }, 6100);
     this._updateScenes();
     this._updateMoment();
   }
 
-  _loadScene() {
-    try { const v = localStorage.getItem('ecran-mural-scene'); return v == null ? -1 : Number(v); } catch (e) { return -1; }
+  /* Bouton de lumière qui correspond à l'état réel (retour d'état Hue) :
+     - scène (scene.turn_on) : la dernière scène lancée sur ce groupe, groupe allumé depuis ;
+     - « Tout éteindre » (light.turn_off) : groupe éteint ;
+     - « Tout allumer » (light.turn_on) : groupe allumé, sans scène en cours. */
+  _activeScene() {
+    const list = (this._config.scenes || []).slice(0, 3);
+    if (this._sceneTap && Date.now() < this._sceneTap.until) return this._sceneTap.i;
+    const svc = (sc) => String(sc.service || 'scene.turn_on');
+    const sceneIdx = list.findIndex((sc) => svc(sc) === 'scene.turn_on' && this._hueSceneActive(sc.target));
+    if (sceneIdx >= 0) return sceneIdx;
+    const offIdx = list.findIndex((sc) => svc(sc) === 'light.turn_off' && sc.target && (this._st(sc.target) || {}).state === 'off');
+    if (offIdx >= 0) return offIdx;
+    return list.findIndex((sc) => svc(sc) === 'light.turn_on' && sc.target && (this._st(sc.target) || {}).state === 'on');
   }
+
+  _hueSceneActive(id) {
+    const s = this._st(id);
+    if (!s || !this._hass) return false;
+    const t = Date.parse(s.state);
+    if (isNaN(t)) return false;
+    const gname = s.attributes.group_name;
+    const states = this._hass.states;
+    const ents = Object.entries(states);
+    const grpE = ents.find(([k, o]) => k.startsWith('light.') && o.attributes && o.attributes.is_hue_group && o.attributes.friendly_name === gname);
+    const grp = grpE && grpE[1];
+    if (!grp || grp.state !== 'on') return false;
+    // Groupe rallumé après la scène (éteint puis allumé autrement) : la scène n'est plus en cours.
+    if (t < Date.parse(grp.last_changed) - 5000) return false;
+    // Une autre scène du même groupe lancée après.
+    if (ents.some(([k, o]) => k !== id && k.startsWith('scene.') && o.attributes && o.attributes.group_name === gname && Date.parse(o.state) > t)) return false;
+    return true;
+  }
+
+  _loadScene() { return -1; }
 
   /* Volets */
   _cover(i, dir) {
