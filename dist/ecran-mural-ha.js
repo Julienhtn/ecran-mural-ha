@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.9.1';
+const EM_VERSION = '0.9.2';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -38,6 +38,7 @@ const EM_ICONS = {
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"></path>',
   back: '<path d="M9 6h11v12H9l-6-6 6-6z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path>',
   gear: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2.2"></circle><circle cx="10" cy="17" r="2.2"></circle>',
+  garage: '<path d="M3 10.5L12 4l9 6.5V20H3z"></path><path d="M7 20v-7.5h10V20M7 15h10M7 17.5h10"></path>',
   hangup: '<path d="M3 15c5-4.5 13-4.5 18 0l-2.5 2.5-3.5-1.5v-2.5c-2-.7-4-.7-6 0V16l-3.5 1.5z"></path>'
 };
 
@@ -622,7 +623,15 @@ class EcranMuralCard extends HTMLElement {
 
       <section class="card covers">
         <div class="row-between"><h2>Volets</h2><p class="small faint">Haut : ouvrir · Bas : fermer</p></div>
-        <div class="cv-grid" style="grid-template-columns:repeat(${Math.max(1, Math.min(5, (c.covers || []).length))},minmax(0,1fr))">${coversHTML}</div>
+        <div class="cv-grid" style="grid-template-columns:repeat(${Math.max(1, Math.min(5, (c.covers || []).length)) + (c.garage ? 1 : 0)},minmax(0,1fr))">${coversHTML}${c.garage ? `<div class="cv cv-garage">
+          <button class="gar-pill press" data-act="garage" data-ref="garBtn" aria-label="${emEsc(c.garage.name || 'Garage')}">
+            <span class="gar-dot" data-ref="garDot" aria-hidden="true"></span>
+            ${emIcon('garage', 30, 'currentColor', 1.7)}
+            <span class="gar-state" data-ref="garState">–</span>
+            <span class="gar-hint" data-ref="garHint"></span>
+          </button>
+          <span class="cv-label">${emEsc(c.garage.name || 'Garage')}</span>
+        </div>` : ''}</div>
       </section>
     </div>
 
@@ -968,6 +977,7 @@ class EcranMuralCard extends HTMLElement {
     this._updateThermo();
     this._updateTempo();
     this._updateScenes();
+    this._updateGarage();
     this._updateCams();
     if (this._isMobile && this._isMobile()) { this._updateSecurity(); this._updateCamTools(); this._scheduleSys(); this._journalOnChange(); }
   }
@@ -1579,6 +1589,7 @@ class EcranMuralCard extends HTMLElement {
         break;
       case 'key': this._key(el.dataset.k); break;
       case 'scene': this._scene(Number(i)); break;
+      case 'garage': this._garage(); break;
       case 'cover': this._cover(Number(i), el.dataset.dir); break;
       case 'temp': this._temp(Number(el.dataset.d)); break;
       case 'period': this._state.period = el.dataset.p; this._renderEnergy(); break;
@@ -1947,6 +1958,47 @@ class EcranMuralCard extends HTMLElement {
   }
 
   _loadScene() { return -1; }
+
+  /* Porte de garage : une seule commande « pas à pas » (ouvrir → stop → fermer) et un capteur ouvert / fermé. */
+  _garageState() {
+    const g = this._config.garage;
+    if (!g) return null;
+    const s = this._st(g.sensor);
+    const act = this._st(g.action);
+    if (!s || s.state === 'unavailable' || s.state === 'unknown' || (act && act.state === 'unavailable')) return 'off';
+    return s.state === (g.closed_state || 'on') ? 'closed' : 'open';
+  }
+
+  _updateGarage() {
+    if (!this._config.garage || !this.$.garBtn) return;
+    const st = this._garageState();
+    // Porte arrivée en bas : le mouvement est terminé.
+    if (st === 'closed' && this._garPrev && this._garPrev !== 'closed') this._garMoving = 0;
+    this._garPrev = st;
+    const moving = this._garMoving && Date.now() < this._garMoving;
+    const txt = { closed: 'Fermée', open: 'Ouverte', off: 'Hors ligne' }[st];
+    this.$.garState.textContent = moving ? 'En mouvement' : txt;
+    this.$.garHint.textContent = st === 'off' ? 'Module injoignable' : moving ? 'Toucher : stop' : st === 'closed' ? 'Toucher : ouvrir' : 'Toucher : fermer';
+    this.$.garBtn.dataset.state = moving ? 'moving' : st;
+    this.$.garBtn.disabled = st === 'off';
+  }
+
+  _garage() {
+    const g = this._config.garage;
+    if (!g || this._garageState() === 'off') return;
+    this._chime('tap');
+    const id = g.action || '';
+    const [dom] = id.split('.');
+    if (dom === 'script') this._call('script', 'turn_on', { entity_id: id });
+    else if (dom === 'button') this._call('button', 'press', { entity_id: id });
+    else if (dom === 'switch') { this._call('switch', 'turn_on', { entity_id: id }); setTimeout(() => this._call('switch', 'turn_off', { entity_id: id }), 600); }
+    // Un nouvel appui pendant le mouvement met en pause : on oublie alors le mouvement.
+    const wasMoving = this._garMoving && Date.now() < this._garMoving;
+    this._garMoving = wasMoving ? 0 : Date.now() + (Number(g.travel_time) || 20) * 1000;
+    clearTimeout(this._garTimer);
+    if (!wasMoving) this._garTimer = setTimeout(() => this._updateGarage(), (Number(g.travel_time) || 20) * 1000 + 200);
+    this._updateGarage();
+  }
 
   /* Volets */
   _cover(i, dir) {
@@ -2665,6 +2717,16 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .sweep-up{opacity:1;background:linear-gradient(to top,transparent 0%,rgba(242,181,68,0.30) 50%,transparent 100%);animation:sweepUp 1.1s cubic-bezier(.65,0,.35,1) 2}
 .sweep-down{opacity:1;background:linear-gradient(to bottom,transparent 0%,rgba(127,176,255,0.30) 50%,transparent 100%);animation:sweepDown 1.1s cubic-bezier(.65,0,.35,1) 2}
 .cv-label{text-align:center;font-size:14px;font-weight:500;white-space:nowrap;transition:color .3s ease}
+.gar-pill{position:relative;flex:1;min-height:0;border-radius:20px;border:1px solid var(--line);background:rgba(255,255,255,0.05);box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 12px 26px -16px rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 4px;color:#C9CBD0}
+.gar-state{font-size:15px;font-weight:600;color:#F2F1EE}
+.gar-hint{font-size:11px;color:#8A8E97;text-align:center;line-height:1.2}
+.gar-dot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#6B6F78}
+.gar-pill[data-state="closed"] .gar-dot{background:#3DD68C;box-shadow:0 0 8px #3DD68C}
+.gar-pill[data-state="open"]{border-color:rgba(242,181,68,0.55);background:rgba(242,181,68,0.12);color:var(--accent)}
+.gar-pill[data-state="open"] .gar-dot{background:#F2B544;box-shadow:0 0 8px #F2B544}
+.gar-pill[data-state="moving"]{border-color:rgba(127,176,255,0.5);background:rgba(127,176,255,0.12);color:#9CC2FF}
+.gar-pill[data-state="moving"] .gar-dot{background:#7FB0FF;animation:blink 1s ease-in-out infinite}
+.gar-pill:disabled{opacity:.45}
 
 .thermo{position:relative;overflow:hidden;padding:18px 20px 20px}
 .thermo-glow{position:absolute;left:50%;top:150px;width:340px;height:340px;margin:-170px 0 0 -170px;border-radius:50%;background:radial-gradient(circle,rgba(242,181,68,0.38) 0%,transparent 60%);opacity:0;transition:opacity 1.4s ease;animation:breathe 4s ease-in-out infinite;pointer-events:none}
@@ -3181,6 +3243,11 @@ const EM_ED_CSS = `
 .ed .cv-on-up{background:var(--ed-amber);color:var(--ed-ink)}
 .ed .cv-on-down{background:var(--ed-indigo);color:#FFFFFF}
 .ed .cv-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.ed .gar-pill{background:var(--ed-card2);border:0;box-shadow:none;border-radius:16px}
+.ed .gar-pill[data-state="open"]{background:var(--ed-amber);color:var(--ed-ink)}
+.ed .gar-pill[data-state="open"] .gar-state,.ed .gar-pill[data-state="open"] .gar-hint{color:var(--ed-ink)}
+.ed .gar-pill[data-state="moving"]{background:var(--ed-indigo);color:#FFFFFF}
+.ed .gar-pill[data-state="moving"] .gar-state,.ed .gar-pill[data-state="moving"] .gar-hint{color:#FFFFFF}
 
 /* Thermostat */
 .ed .arc{filter:none}
