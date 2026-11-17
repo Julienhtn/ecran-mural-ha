@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.9.3';
+const EM_VERSION = '0.9.4';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1091,7 +1091,7 @@ class EcranMuralCard extends HTMLElement {
 
   _openSummary() {
     const doors = this._config.doors || [];
-    const open = doors.filter((d) => { const s = this._st(d.entity); return s && s.state === 'on'; });
+    const open = doors.filter((d) => { const s = this._st(d.entity); return s && s.state === (d.open_state || 'on'); });
     if (!doors.length) return 'Appuyer pour armer';
     if (!open.length) return 'Toutes les ouvertures sont fermées';
     return `Ouvert : ${open.map((d) => d.name).join(', ')}`;
@@ -1104,7 +1104,7 @@ class EcranMuralCard extends HTMLElement {
       const s = this._st(d.entity);
       const dot = el.querySelector('.dot');
       if (!s || s.state === 'unavailable' || s.state === 'unknown') { dot.style.background = '#6B6F78'; dot.style.boxShadow = 'none'; el.title = 'Indisponible'; return; }
-      const open = s.state === 'on';
+      const open = s.state === (d.open_state || 'on');
       const col = open ? '#FF6B4A' : '#3DD68C';
       dot.style.background = col;
       dot.style.boxShadow = `0 0 8px ${col}`;
@@ -2366,7 +2366,7 @@ class EcranMuralCard extends HTMLElement {
     this.$.secDoors.innerHTML = doors.map((d) => {
       const s = this._st(d.entity);
       const bad = !s || s.state === 'unavailable' || s.state === 'unknown';
-      const isOpen = s && s.state === 'on';
+      const isOpen = s && s.state === (d.open_state || 'on');
       if (isOpen) open++;
       if (bad) ko++;
       const kind = d.kind || (/fen[eê]tre|baie|velux/i.test(d.name + ' ' + (s ? s.attributes.friendly_name : '')) ? 'FENÊTRE' : 'PORTE');
@@ -2466,8 +2466,8 @@ class EcranMuralCard extends HTMLElement {
     if (!this._hass || !this.$.jList) return;
     const c = this._config;
     const doors = c.doors || [];
-    const doorName = {};
-    doors.forEach((d) => { doorName[d.entity] = d.name; });
+    const doorName = {}, doorOpen = {};
+    doors.forEach((d) => { doorName[d.entity] = d.name; doorOpen[d.entity] = d.open_state || 'on'; });
     const ids = [c.alarm].concat(doors.map((d) => d.entity)).filter(Boolean);
     const start = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     let evs = [];
@@ -2499,7 +2499,7 @@ class EcranMuralCard extends HTMLElement {
         } else cause = null;
         out.push({ t, txt, kind: alarmTxt[e.state][1] });
       }
-      else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) out.push({ t, txt: `${doorName[e.entity_id]} · ${e.state === 'on' ? 'ouverture' : 'fermeture'}`, kind: e.state === 'on' ? 'door' : 'door-off' });
+      else if (doorName[e.entity_id] && (e.state === 'on' || e.state === 'off')) { const op = e.state === doorOpen[e.entity_id]; out.push({ t, txt: `${doorName[e.entity_id]} · ${op ? 'ouverture' : 'fermeture'}`, kind: op ? 'door' : 'door-off' }); }
       else if (e.domain === 'ecran_mural' || (e.name === 'Caméra' && e.message)) out.push({ t, txt: e.message.charAt(0).toUpperCase() + e.message.slice(1), kind: 'cam' });
     });
     out.sort((a, b) => b.t - a.t);
