@@ -4,7 +4,7 @@
  * météo, EDF Tempo, consommations, appel visio, écran de veille.
  * Licence MIT.
  */
-const EM_VERSION = '0.9.2';
+const EM_VERSION = '0.9.3';
 
 const EM_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const EM_W = 1280;
@@ -1980,6 +1980,7 @@ class EcranMuralCard extends HTMLElement {
     this.$.garState.textContent = moving ? 'En mouvement' : txt;
     this.$.garHint.textContent = st === 'off' ? 'Module injoignable' : moving ? 'Toucher : stop' : st === 'closed' ? 'Toucher : ouvrir' : 'Toucher : fermer';
     this.$.garBtn.dataset.state = moving ? 'moving' : st;
+    this.$.garBtn.dataset.door = st;
     this.$.garBtn.disabled = st === 'off';
   }
 
@@ -2722,10 +2723,12 @@ h3{font-size:13px;font-weight:500;color:#A3A6AD}
 .gar-hint{font-size:11px;color:#8A8E97;text-align:center;line-height:1.2}
 .gar-dot{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#6B6F78}
 .gar-pill[data-state="closed"] .gar-dot{background:#3DD68C;box-shadow:0 0 8px #3DD68C}
-.gar-pill[data-state="open"]{border-color:rgba(242,181,68,0.55);background:rgba(242,181,68,0.12);color:var(--accent)}
-.gar-pill[data-state="open"] .gar-dot{background:#F2B544;box-shadow:0 0 8px #F2B544}
+.gar-pill[data-state="open"]{border-color:rgba(255,107,74,0.55);background:rgba(255,107,74,0.12);color:#FF8A6E}
+.gar-pill[data-state="open"] .gar-dot{background:#FF6B4A;box-shadow:0 0 8px #FF6B4A}
 .gar-pill[data-state="moving"]{border-color:rgba(127,176,255,0.5);background:rgba(127,176,255,0.12);color:#9CC2FF}
 .gar-pill[data-state="moving"] .gar-dot{background:#7FB0FF;animation:blink 1s ease-in-out infinite}
+.gar-pill[data-state="moving"][data-door="closed"] .gar-dot{background:#3DD68C}
+.gar-pill[data-state="moving"][data-door="open"] .gar-dot{background:#FF6B4A}
 .gar-pill:disabled{opacity:.45}
 
 .thermo{position:relative;overflow:hidden;padding:18px 20px 20px}
@@ -3244,7 +3247,7 @@ const EM_ED_CSS = `
 .ed .cv-on-down{background:var(--ed-indigo);color:#FFFFFF}
 .ed .cv-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .ed .gar-pill{background:var(--ed-card2);border:0;box-shadow:none;border-radius:16px}
-.ed .gar-pill[data-state="open"]{background:var(--ed-amber);color:var(--ed-ink)}
+.ed .gar-pill[data-state="open"]{background:var(--ed-coral);color:var(--ed-ink)}
 .ed .gar-pill[data-state="open"] .gar-state,.ed .gar-pill[data-state="open"] .gar-hint{color:var(--ed-ink)}
 .ed .gar-pill[data-state="moving"]{background:var(--ed-indigo);color:#FFFFFF}
 .ed .gar-pill[data-state="moving"] .gar-state,.ed .gar-pill[data-state="moving"] .gar-hint{color:#FFFFFF}
