@@ -75,5 +75,26 @@
     "logo": "apple-tv",
     "tuile": false,
     "note": "Salon"
+  },
+  {
+    "id": "avosdim",
+    "nom": "Box Avosdim",
+    "icone": "volet",
+    "tuile": false,
+    "note": "Volets roulants"
+  },
+  {
+    "id": "chromecast",
+    "nom": "Google Chromecast",
+    "icone": "hifi",
+    "tuile": false,
+    "note": "Chaîne hi-fi"
+  },
+  {
+    "id": "homemini",
+    "nom": "Google Home Mini",
+    "icone": "mini",
+    "tuile": false,
+    "note": "Enceinte et assistant vocal"
   }
 ]

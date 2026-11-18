@@ -131,12 +131,17 @@ const ICONS = {
   tableau: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 15l3-3 3 2 4-5"/>',
   tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
   box: '<rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 12.5h.01M11 12.5h.01M8 8l-2-4M16 8l2-4"/>',
+  volet: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 7h16M4 10.5h16M4 14h16M4 17.5h16"/>',
+  hifi: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><circle cx="12" cy="14.5" r="3.5"/><circle cx="12" cy="7.5" r="1.4"/>',
+  mini: '<ellipse cx="12" cy="13" rx="9" ry="5"/><path d="M3 13v1.5c0 2.8 4 5 9 5s9-2.2 9-5V13"/><path d="M8.5 12.5h.01M11 12.5h.01M13.5 12.5h.01M16 12.5h.01"/>',
+  switch: '<rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 12h.01M9 12h.01M12 12h.01M15 12h.01M18 12h.01"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
   tablette: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M11 18h2"/>',
   garage: '<path d="M3 10.5L12 4l9 6.5V20H3z"/><path d="M7 20v-7.5h10V20M7 15h10M7 17.5h10"/>',
   monde: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   lien: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
 };
-const COLORS = { tv: ['rgba(200,200,210,0.12)', '#D6D8DD'], box: ['rgba(200,200,210,0.12)', '#D6D8DD'], serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
+const COLORS = { volet: ['rgba(200,200,210,0.12)', '#D6D8DD'], hifi: ['rgba(200,200,210,0.12)', '#D6D8DD'], mini: ['rgba(200,200,210,0.12)', '#D6D8DD'], tv: ['rgba(200,200,210,0.12)', '#D6D8DD'], box: ['rgba(200,200,210,0.12)', '#D6D8DD'], serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
 // Logos officiels : projet libre « dashboard-icons » (chargés depuis internet ; pictogramme générique si indisponible).
 const LOGOS = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 window.svgFor = (name) => svg(name, 28);
@@ -206,61 +211,67 @@ function drawNet() {
   const dot = (ok) => ok === true ? '#3DD68C' : ok === false ? '#FF6B4A' : '#5A606E';
   // Liaisons : couleur et tirets par type
   const L = { fibre: ['#F2B544', '', 'Fibre'], eth: ['#9AA0AC', '', 'Ethernet'], wifi: ['#7FB0FF', '6 5', 'Wi-Fi'], zigbee: ['#3DD68C', '2 4', 'Zigbee'], cloud: ['#B9A8FF', '8 6', 'Internet (cloud)'], virt: ['#FF9A5C', '', 'Pont virtuel vmbr0'] };
-  const W = 1200, H = 860;
+  const W = 1300, H = 880;
   const nodes = {}, out = [];
   const node = (id, x, y, w, h, title, sub, ic, o = {}) => { nodes[id] = { x, y, w, h }; out.push({ id, x, y, w, h, title, sub, ic, ...o }); };
-  // Colonne centrale : internet → box → routeur
-  node('inet', 520, 24, 160, 54, 'Internet', 'WAN', 'monde');
-  node('box', 500, 122, 200, 58, 'Box opérateur', 'IP publique · NAT', 'box');
-  node('gw', 470, 232, 260, 64, 'Google Wifi', '192.168.86.1 · routeur · DHCP', 'lien', { accent: '#9CC2FF' });
-  // Hôte Proxmox (à gauche)
-  const pveOn = S('proxmox').ok;
-  node('pve', 70, 388, 516, 62, 'Proxmox VE · Dell OptiPlex 3000', `${ipOf(S('proxmox')) || '192.168.86.10'} · ${(n.modele || 'Celeron N5105').replace(/\(R\)|\(TM\)|CPU|Intel|@.*$/g, '').replace(/\s+/g, ' ').trim()} · CPU ${n.cpu != null ? Math.round(n.cpu * 100) + ' %' : '–'} · RAM ${n.memTotal ? Math.round(pct(n.mem, n.memTotal) * 100) + ' %' : '–'}`, 'serveur', { accent: '#FF9A5C', ok: pveOn });
-  const guests = [[100, 'ha', 'Home Assistant', 'maison', '#5CC8FF'], [110, 'visages', 'Visages', 'visage', '#B9A8FF'], [120, 'tableau', 'Tableau de bord', 'tableau', '#B9A8FF']];
-  guests.forEach(([vmid, sid, nom, ic, c], i) => {
-    const m = M(vmid), s = S(sid), on = m && m.status === 'running';
-    node('g' + vmid, 70 + i * 176, 540, 164, 92, nom, `${ipOf(s) || '–'}`, ic, { accent: c, ok: m ? on : null, tag: `${m ? (m.type === 'lxc' ? 'LXC' : 'VM') : '—'} ${vmid}`, extra: on ? `${Math.round((m.cpu || 0) * 100)} % · ${Gn(m.mem)}/${Go(m.maxmem)}` : (m ? 'arrêtée' : 'à installer') });
-  });
-  // Appareils (à droite)
-  const devs = [['tablette', 'Tablette entrée', 'Fully Kiosk', 'tablette', 'wifi'], ['garage', 'Shelly 1 Gen4', 'Porte du garage', 'garage', 'wifi'], ['appletv', 'Apple TV', 'Salon', 'tv', 'wifi'], ['hue', 'Pont Philips Hue', 'Passerelle Zigbee', 'lien', 'eth']];
-  devs.forEach(([sid, nom, sub, ic, link], i) => { const s = S(sid); node(sid, 820, 360 + i * 82, 300, 62, nom, `${ipOf(s) ? ipOf(s) + ' · ' : ''}${sub}`, ic, { ok: s.externe ? null : s.ok, link }); });
-  node('lampes', 820, 720, 300, 58, 'Lampes et détecteur Hue', 'Réseau Zigbee du pont', 'lien', { ok: null });
-  node('netatmo', 880, 122, 260, 58, 'Netatmo', 'Sonnette · caméra · thermostat', 'monde', { ok: null });
-  node('nabu', 180, 122, 240, 58, 'Nabu Casa', 'Accès à distance à HA', 'monde', { ok: null });
-
   const C = (id, side) => { const b = nodes[id]; return side === 't' ? [b.x + b.w / 2, b.y] : side === 'b' ? [b.x + b.w / 2, b.y + b.h] : side === 'l' ? [b.x, b.y + b.h / 2] : [b.x + b.w, b.y + b.h / 2]; };
   const edges = [];
   const path = (pts, type, label, lx, ly) => edges.push({ d: 'M' + pts.map((p) => p.join(',')).join(' L'), type, label, lx, ly });
+  const lab = (label, type, lx, ly) => edges.push({ label, type, lx, ly, only: true });
+  const sub2 = (sid, txt) => { const ip = ipOf(S(sid)); return ip ? ip + ' · ' + txt : txt; };
+  // Colonne centrale : internet → box → Google Wifi → switch
+  node('inet', 570, 24, 160, 54, 'Internet', 'WAN', 'monde');
+  node('box', 550, 122, 200, 58, 'Box opérateur', 'IP publique · NAT', 'box');
+  node('gw', 520, 236, 260, 64, 'Google Wifi', '192.168.86.1 · routeur · DHCP', 'lien', { accent: '#9CC2FF' });
+  node('sw', 550, 346, 200, 56, 'Switch 1 Gb', 'Ethernet', 'switch', { accent: '#C9CBD0' });
+  node('nabu', 270, 122, 240, 58, 'Nabu Casa', 'Accès à distance à HA', 'monde');
+  node('netatmo', 990, 122, 270, 58, 'Netatmo', 'Sonnette · caméra · thermostat', 'monde');
+  // Hôte Proxmox (à gauche, relié au switch)
+  node('pve', 56, 486, 528, 62, 'Proxmox VE · Dell OptiPlex 3000', `${ipOf(S('proxmox')) || '192.168.86.10'} · ${(n.modele || 'Celeron N5105').replace(/\(R\)|\(TM\)|CPU|Intel|@.*$/g, '').replace(/\s+/g, ' ').trim()} · CPU ${n.cpu != null ? Math.round(n.cpu * 100) + ' %' : '–'} · RAM ${n.memTotal ? Math.round(pct(n.mem, n.memTotal) * 100) + ' %' : '–'}`, 'serveur', { accent: '#FF9A5C', ok: S('proxmox').ok });
+  const guests = [[100, 'ha', 'Home Assistant', 'maison', '#5CC8FF'], [110, 'visages', 'Visages', 'visage', '#B9A8FF'], [120, 'tableau', 'Tableau de bord', 'tableau', '#B9A8FF']];
+  guests.forEach(([vmid, sid, nom, ic, c], i) => {
+    const m = M(vmid), s = S(sid), on = m && m.status === 'running';
+    node('g' + vmid, 56 + i * 182, 636, 164, 92, nom, `${ipOf(s) || '–'}`, ic, { accent: c, ok: m ? on : null, tag: `${m ? (m.type === 'lxc' ? 'LXC' : 'VM') : '—'} ${vmid}`, extra: on ? `${Math.round((m.cpu || 0) * 100)} % · ${Gn(m.mem)}/${Go(m.maxmem)}` : (m ? 'arrêtée' : 'à installer') });
+  });
+  // Appareils en Ethernet (centre, reliés au switch)
+  node('appletv', 660, 486, 250, 60, 'Apple TV', sub2('appletv', 'Salon'), 'tv', { ok: null });
+  node('hue', 660, 572, 250, 60, 'Pont Philips Hue', sub2('hue', 'Passerelle Zigbee'), 'lien', { ok: null });
+  node('lampes', 660, 682, 250, 58, 'Lampes et détecteur Hue', 'Réseau Zigbee', 'bulb', { ok: null });
+  // Appareils en Wi-Fi (à droite, empilés)
+  const wifi = [['tablette', 'Tablette entrée', 'Fully Kiosk', 'tablette'], ['garage', 'Shelly 1 Gen4', 'Porte du garage', 'garage'], ['avosdim', 'Box Avosdim', 'Volets roulants', 'volet'], ['chromecast', 'Google Chromecast', 'Chaîne hi-fi', 'hifi'], ['homemini', 'Google Home Mini', 'Enceinte', 'mini']];
+  wifi.forEach(([sid, nom, sub, ic], i) => { const s = S(sid); node(sid, 990, 346 + i * 80, 270, 60, nom, sub2(sid, sub), ic, { ok: s.url && !s.externe ? s.ok : null }); });
+
+  // Liaisons
   const [ix, iy] = C('inet', 'b'), [bx, by] = C('box', 't'); path([[ix, iy], [bx, by]], 'fibre', 'Fibre', ix + 10, (iy + by) / 2 + 4);
   const [b2x, b2y] = C('box', 'b'), [gx, gy] = C('gw', 't'); path([[b2x, b2y], [gx, gy]], 'eth', 'Ethernet', b2x + 10, (b2y + gy) / 2 + 4);
-  // Routeur → Proxmox
-  const [gbx, gby] = C('gw', 'b'), [px, py] = C('pve', 't'); path([[gbx, gby], [gbx, 340], [px, 340], [px, py]], 'eth', 'Ethernet', px + 10, 368);
-  // Proxmox → machines (pont virtuel)
+  const [g2x, g2y] = C('gw', 'b'), [sx, sy] = C('sw', 't'); path([[g2x, g2y], [sx, sy]], 'eth', '1 Gb', g2x + 10, (g2y + sy) / 2 + 4);
+  const [swx, swy] = C('sw', 'b');
+  const [px, py] = C('pve', 't'); path([[swx, swy], [swx, 446], [px, 446], [px, py]], 'eth', '', 0, 0);
+  lab('Ethernet 1 Gb', 'eth', px + 10, 470);
+  ['appletv', 'hue'].forEach((id) => { const [lx, ly] = C(id, 'l'); path([[swx, swy], [swx, 446], [636, 446], [636, ly], [lx, ly]], 'eth', '', 0, 0); });
   const [pbx, pby] = C('pve', 'b');
-  guests.forEach(([vmid]) => { const [tx, ty] = C('g' + vmid, 't'); path([[pbx, pby], [pbx, 505], [tx, 505], [tx, ty]], 'virt', '', 0, 0); });
-  edges.push({ label: 'vmbr0 · pont virtuel', type: 'virt', lx: pbx + 10, ly: 500, only: true });
-  // Routeur → appareils (bus vertical à droite)
-  const [grx, gry] = C('gw', 'r');
-  devs.forEach(([sid, , , , link]) => { const [lx, ly] = C(sid, 'l'); path([[grx, gry], [770, gry], [770, ly], [lx, ly]], link, '', 0, 0); });
-  edges.push({ label: 'Wi-Fi / Ethernet', type: 'wifi', lx: 778, ly: gry - 8, only: true });
-  // Hue → lampes (Zigbee)
+  guests.forEach(([vmid]) => { const [tx, ty] = C('g' + vmid, 't'); path([[pbx, pby], [pbx, 600], [tx, 600], [tx, ty]], 'virt', '', 0, 0); });
+  lab('vmbr0 · pont virtuel', 'virt', pbx + 10, 595);
   const [hbx, hby] = C('hue', 'b'), [lpx, lpy] = C('lampes', 't'); path([[hbx, hby], [lpx, lpy]], 'zigbee', 'Zigbee', hbx + 10, (hby + lpy) / 2 + 4);
-  // Cloud : Internet ↔ Netatmo, Internet ↔ Nabu Casa
+  const [grx, gry] = C('gw', 'r');
+  wifi.forEach(([sid]) => { const [lx, ly] = C(sid, 'l'); path([[grx, gry], [950, gry], [950, ly], [lx, ly]], 'wifi', '', 0, 0); });
+  lab('Wi-Fi', 'wifi', 800, gry - 8);
+  const [ntx, nty] = C('netatmo', 'b'); path([[ntx, nty], [ntx, 214], [950, 214], [950, gry]], 'wifi', '', 0, 0);
   const [irx, iry] = C('inet', 'r'), [nlx, nly] = C('netatmo', 'l'); path([[irx, iry], [nlx - 40, iry], [nlx - 40, nly], [nlx, nly]], 'cloud', '', 0, 0);
   const [ilx, ily] = C('inet', 'l'), [nrx, nry] = C('nabu', 'r'); path([[ilx, ily], [nrx + 40, ily], [nrx + 40, nry], [nrx, nry]], 'cloud', '', 0, 0);
-  // Netatmo en Wi-Fi sur le réseau local
-  const [ntx, nty] = C('netatmo', 'b'); path([[ntx, nty], [ntx, gry - 20], [grx + 20, gry - 20], [grx + 20, gry - 4]], 'wifi', '', 0, 0);
-
+  const zones = `<rect x="24" y="200" width="1252" height="664" rx="22" fill="rgba(61,214,140,0.025)" stroke="rgba(61,214,140,0.35)" stroke-dasharray="6 6"/>
+    <text x="44" y="226" font-size="12" font-weight="700" fill="#7BE2AE" letter-spacing="1.5">LAN 192.168.86.0/24</text>
+    <text x="44" y="244" font-size="11" fill="#7F8592">Pas de VLAN · réseau unique</text>
+    <rect x="40" y="470" width="560" height="276" rx="18" fill="rgba(255,154,92,0.03)" stroke="rgba(255,154,92,0.45)"/>
+    <text x="56" y="766" font-size="11" fill="#B07A5C" letter-spacing="1.2">HÔTE PHYSIQUE</text>
+    <rect x="644" y="470" width="282" height="284" rx="18" fill="rgba(200,200,210,0.02)" stroke="rgba(200,200,210,0.25)"/>
+    <text x="660" y="774" font-size="11" fill="#8D919B" letter-spacing="1.2">FILAIRE</text>
+    <rect x="974" y="330" width="302" height="408" rx="18" fill="rgba(127,176,255,0.025)" stroke="rgba(127,176,255,0.35)" stroke-dasharray="4 5"/>
+    <text x="990" y="758" font-size="11" fill="#7F96BF" letter-spacing="1.2">WI-FI</text>`;
   const ICO = (name, x, y, c) => `<g transform="translate(${x},${y})" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.lien}</g>`;
   let s = `<svg class="arch" viewBox="0 0 ${W} ${H}" role="img" aria-label="Schéma d'architecture du réseau de la maison">`;
   // Zones
-  s += `<rect x="40" y="208" width="1120" height="636" rx="22" fill="rgba(61,214,140,0.025)" stroke="rgba(61,214,140,0.35)" stroke-dasharray="6 6"/>
-    <text x="60" y="232" font-size="12" font-weight="700" fill="#7BE2AE" letter-spacing="1.5">LAN 192.168.86.0/24</text>
-    <text x="60" y="250" font-size="11" fill="#7F8592">Pas de VLAN · réseau unique</text>
-    <rect x="56" y="372" width="544" height="282" rx="18" fill="rgba(255,154,92,0.03)" stroke="rgba(255,154,92,0.45)"/>
-    <text x="72" y="672" font-size="11" fill="#B07A5C" letter-spacing="1.2">HÔTE PHYSIQUE · 1 câble Ethernet</text>
-    <rect x="800" y="340" width="340" height="452" rx="18" fill="rgba(127,176,255,0.025)" stroke="rgba(127,176,255,0.35)" stroke-dasharray="4 5"/>
-    <text x="816" y="812" font-size="11" fill="#7F96BF" letter-spacing="1.2">OBJETS CONNECTÉS</text>`;
+  s += zones;
   edges.filter((e) => !e.only).forEach((e) => { const t = L[e.type]; s += `<path d="${e.d}" fill="none" stroke="${t[0]}" stroke-width="2" ${t[1] ? `stroke-dasharray="${t[1]}"` : ''} stroke-linejoin="round" opacity="0.85"/>`; });
   edges.filter((e) => e.label).forEach((e) => { s += `<text x="${e.lx}" y="${e.ly}" font-size="11" fill="${L[e.type][0]}" class="mono">${esc(e.label)}</text>`; });
   out.forEach((b) => {
