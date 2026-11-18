@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Serveur maison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : en-tête avec horloge, trois jauges du serveur, machines, puis tuiles de raccourcis. Même univers sombre et ambré que l'écran mural. */
+:root{
+  --bg:#08090C; --panel:#111318; --panel2:#171A21; --line:#23262E;
+  --fg:#F2F1EE; --mut:#9A9DA6; --faint:#666A74;
+  --accent:#F2B544; --ok:#3DD68C; --warn:#F2B544; --bad:#FF6B4A; --blue:#7FB0FF;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(1200px 600px at 85% -10%,rgba(242,181,68,0.08),transparent 60%),var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45;min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+h1{margin:4px 0 0;font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-.02em}
+.sub{color:var(--mut);font-size:14px;margin-top:4px}
+.clock{font-family:var(--mono);font-size:clamp(28px,4vw,40px);font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px}
+h2{margin:0 0 14px;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between;gap:12px}
+h2 span{font-weight:500;letter-spacing:.04em;text-transform:none;color:var(--faint)}
+.gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.gauge{display:flex;align-items:center;gap:16px;min-width:0}
+.ring{position:relative;width:96px;height:96px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .v{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.ginfo{min-width:0}
+.ginfo b{display:block;font-size:16px;font-weight:600}
+.ginfo span{display:block;color:var(--mut);font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spark{margin-top:14px;height:56px;width:100%;display:block}
+.machines{display:flex;flex-direction:column}
+.m{display:grid;grid-template-columns:minmax(0,1.6fr) 90px minmax(0,1fr) minmax(0,1fr) 110px;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.m:first-child{border-top:0}
+.m-name{display:flex;align-items:center;gap:12px;min-width:0}
+.m-name b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-name small{color:var(--faint);font-family:var(--mono);font-size:12px}
+.pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;text-align:center;background:rgba(255,255,255,0.06);color:var(--mut)}
+.pill.on{background:rgba(61,214,140,0.12);color:var(--ok)}
+.bar{display:flex;flex-direction:column;gap:5px;min-width:0}
+.bar span{font-size:12px;color:var(--mut);font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar i{display:block;height:6px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden}
+.bar i em{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .6s ease}
+.m-up{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:right}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.tile{position:relative;display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:inherit;text-decoration:none;transition:transform .15s ease,border-color .2s ease}
+.tile:hover{transform:translateY(-2px);border-color:rgba(242,181,68,0.45)}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--c,rgba(242,181,68,0.14));color:var(--ic,var(--accent))}
+.tile b{font-size:16px;font-weight:600}
+.tile code{font-family:var(--mono);font-size:12px;color:var(--faint);word-break:break-all}
+.dot{position:absolute;top:18px;right:18px;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.dot i{width:9px;height:9px;border-radius:50%;background:#555A64}
+.dot.ok i{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.ko i{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+.err{border:1px solid rgba(255,107,74,0.4);background:rgba(255,107,74,0.08);color:#FFB4A3;border-radius:14px;padding:12px 16px;font-size:14px}
+footer{color:var(--faint);font-size:12px;text-align:center}
+@media (max-width:860px){.gauges{grid-template-columns:1fr}.m{grid-template-columns:minmax(0,1fr) 80px;row-gap:8px}.m .bar,.m-up{grid-column:1/-1}.m-up{text-align:left}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Maison · réseau local</div>
+      <h1>Serveur maison</h1>
+      <div class="sub" id="sub">Connexion au serveur…</div>
+    </div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <div class="err" id="err" hidden></div>
+
+  <section class="card">
+    <h2>Serveur <span id="model"></span></h2>
+    <div class="gauges">
+      <div class="gauge"><div class="ring" id="gCpu"></div><div class="ginfo"><b>Processeur</b><span id="tCpu">–</span></div></div>
+      <div class="gauge"><div class="ring" id="gMem"></div><div class="ginfo"><b>Mémoire</b><span id="tMem">–</span></div></div>
+      <div class="gauge"><div class="ring" id="gDisk"></div><div class="ginfo"><b>Disque système</b><span id="tDisk">–</span></div></div>
+    </div>
+    <svg class="spark" id="spark" viewBox="0 0 600 56" preserveAspectRatio="none" role="img" aria-label="Processeur sur les 3 dernières minutes"></svg>
+  </section>
+
+  <section class="card">
+    <h2>Machines <span id="nbm"></span></h2>
+    <div class="machines" id="machines"></div>
+  </section>
+
+  <section>
+    <h2 style="padding:0 4px">Accès rapides <span>clic pour ouvrir</span></h2>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <footer>Mis à jour toutes les 2 secondes · <span id="maj">–</span></footer>
+</div>
+
+<script>
+const ICONS = {
+  serveur: '<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01M12 7.5h4M12 16.5h4"/>',
+  maison: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
+  visage: '<circle cx="12" cy="10" r="4"/><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5"/><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3"/>',
+  tablette: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M11 18h2"/>',
+  garage: '<path d="M3 10.5L12 4l9 6.5V20H3z"/><path d="M7 20v-7.5h10V20M7 15h10M7 17.5h10"/>',
+  monde: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  lien: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
+};
+const COLORS = { serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
+const $ = (id) => document.getElementById(id);
+const svg = (name, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.lien}</svg>`;
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const Go = (b) => b == null ? '–' : (b / 1073741824).toLocaleString('fr-FR', { maximumFractionDigits: b < 10737418240 ? 1 : 0 }) + ' Go';
+const pct = (a, b) => (a != null && b) ? a / b : 0;
+const dur = (s) => { if (!s) return '–'; const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} j ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
+const col = (p) => p > 0.9 ? 'var(--bad)' : p > 0.75 ? 'var(--warn)' : 'var(--ok)';
+
+function ring(el, p) {
+  const r = 42, c = 2 * Math.PI * r, v = Math.max(0, Math.min(1, p || 0));
+  el.innerHTML = `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="9"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="${col(v)}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}" style="transition:stroke-dasharray .6s ease"/></svg><div class="v">${Math.round(v * 100)}%</div>`;
+}
+
+const hist = [];
+function spark() {
+  const W = 600, H = 56, n = 90;
+  const pts = hist.slice(-n);
+  if (pts.length < 2) { $('spark').innerHTML = ''; return; }
+  const X = (i) => W - (pts.length - 1 - i) * (W / (n - 1)), Y = (v) => H - 4 - v * (H - 8);
+  const line = pts.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  $('spark').innerHTML = `<line x1="0" x2="${W}" y1="${Y(0.5)}" y2="${Y(0.5)}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3 5"/>
+    <polygon points="${line} ${X(pts.length - 1).toFixed(1)},${H} ${X(0).toFixed(1)},${H}" fill="rgba(242,181,68,0.10)"/>
+    <polyline points="${line}" fill="none" stroke="#F2B544" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+}
+
+let tilesBuilt = '';
+function render(d) {
+  $('err').hidden = !d.erreur;
+  if (d.erreur) $('err').textContent = 'Le serveur Proxmox ne répond pas (' + d.erreur + '). Les raccourcis restent utilisables.';
+  const n = d.noeud;
+  if (n) {
+    $('sub').textContent = `Proxmox ${n.version ? n.version.split('/')[1] || '' : ''} · nœud « ${n.nom} » · allumé depuis ${dur(n.uptime)}`;
+    $('model').textContent = n.modele ? `${n.modele} · ${n.coeurs || '?'} cœurs` : '';
+    ring($('gCpu'), n.cpu); ring($('gMem'), pct(n.mem, n.memTotal)); ring($('gDisk'), pct(n.disque, n.disqueTotal));
+    $('tCpu').textContent = n.charge ? `charge ${n.charge.map((x) => Number(x).toFixed(2)).join(' · ')}` : '–';
+    $('tMem').textContent = `${Go(n.mem)} / ${Go(n.memTotal)}`;
+    $('tDisk').textContent = `${Go(n.disque)} / ${Go(n.disqueTotal)}`;
+    hist.push(n.cpu || 0); if (hist.length > 200) hist.shift(); spark();
+  }
+  const ms = d.machines || [];
+  $('nbm').textContent = ms.length ? `${ms.filter((m) => m.status === 'running').length} / ${ms.length} en marche` : '';
+  $('machines').innerHTML = ms.map((m) => {
+    const on = m.status === 'running', pm = pct(m.mem, m.maxmem), name = m.name || ('#' + m.vmid);
+    const ic = /home|assistant|haos/i.test(name) ? 'maison' : /visage/i.test(name) ? 'visage' : 'serveur';
+    return `<div class="m">
+      <div class="m-name"><span class="ico" style="--c:${COLORS[ic][0]};--ic:${COLORS[ic][1]};width:38px;height:38px;border-radius:11px">${svg(ic, 20)}</span><div style="min-width:0"><b>${esc(name)}</b><br><small>${m.type === 'lxc' ? 'Conteneur' : 'Machine virtuelle'} ${m.vmid}</small></div></div>
+      <span class="pill ${on ? 'on' : ''}">${on ? 'En marche' : 'Arrêtée'}</span>
+      <div class="bar"><span>Processeur ${on ? Math.round((m.cpu || 0) * 100) + ' %' : '–'}</span><i><em style="width:${on ? Math.min(100, (m.cpu || 0) * 100) : 0}%;background:${col(m.cpu || 0)}"></em></i></div>
+      <div class="bar"><span>Mémoire ${on ? Go(m.mem) + ' / ' + Go(m.maxmem) : '–'}</span><i><em style="width:${on ? pm * 100 : 0}%;background:${col(pm)}"></em></i></div>
+      <div class="m-up">${on ? 'depuis ' + dur(m.uptime) : ''}</div>
+    </div>`;
+  }).join('') || '<p class="sub">Aucune machine trouvée.</p>';
+  const sv = d.services || [];
+  const key = sv.map((s) => s.id).join('|');
+  if (key !== tilesBuilt) {
+    tilesBuilt = key;
+    $('tiles').innerHTML = sv.map((s) => {
+      const c = COLORS[s.icone] || COLORS.monde;
+      return `<a class="tile" href="${esc(s.url)}" target="_blank" rel="noopener" data-id="${esc(s.id)}">
+        <span class="dot" data-dot="${esc(s.id)}"><i></i><span></span></span>
+        <span class="ico" style="--c:${c[0]};--ic:${c[1]}">${svg(s.icone, 26)}</span>
+        <div><b>${esc(s.nom)}</b><br><code>${esc(s.url.replace(/^https?:\/\//, ''))}</code></div>
+      </a>`;
+    }).join('');
+  }
+  sv.forEach((s) => {
+    const el = document.querySelector(`[data-dot="${CSS.escape(s.id)}"]`);
+    if (!el) return;
+    el.className = 'dot ' + (s.externe ? '' : s.ok === true ? 'ok' : s.ok === false ? 'ko' : '');
+    el.lastElementChild.textContent = s.externe ? 'internet' : s.ok === true ? `${s.ms} ms` : s.ok === false ? 'hors ligne' : '';
+  });
+  $('maj').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+async function tick() {
+  try { const r = await fetch('/api/etat', { cache: 'no-store' }); render(await r.json()); }
+  catch (e) { $('err').hidden = false; $('err').textContent = 'Le tableau de bord ne répond plus. Nouvel essai dans 2 secondes.'; }
+}
+function clock() { const d = new Date(); $('clock').textContent = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+clock(); setInterval(clock, 5000);
+tick(); setInterval(tick, 2000);
+</script>
+</body>
+</html>
