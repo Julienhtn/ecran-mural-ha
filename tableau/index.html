@@ -55,6 +55,17 @@ h1{margin:4px 0 0;font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:
 .guest{border-left:3px solid var(--gc,#5CC8FF)}
 .devs{display:flex;flex-direction:column;gap:10px}
 .wifi{border:2px dashed rgba(127,176,255,0.4);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.vlan{width:100%;border:1.5px solid rgba(61,214,140,0.35);border-radius:24px;padding:14px 16px 18px;background:rgba(61,214,140,0.03);display:flex;flex-direction:column;align-items:center}
+.vlan-h{align-self:stretch;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.vlan-h b{font-size:13px;font-weight:600;color:#7BE2AE}
+.vlan-h span{font-size:12px;color:var(--mut)}
+.scan{width:100%;margin-top:18px}
+.scan table{width:100%;border-collapse:collapse;font-size:13px}
+.scan th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:8px 10px;border-bottom:1px solid var(--line)}
+.scan td{padding:8px 10px;border-bottom:1px solid var(--line);color:#D6D8DD}
+.scan td code{font-family:var(--mono);font-size:12px;color:var(--fg)}
+.scan td.k{color:var(--accent);font-weight:600}
+.scan-wrap{overflow-x:auto}
 .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--mut)}
 @media (max-width:760px){.branches{grid-template-columns:1fr;border-top:0;padding-top:0}.branches>div::before{display:none}.branches>div+div{margin-top:22px}}
 .err{border:1px solid rgba(255,107,74,0.4);background:rgba(255,107,74,0.08);color:#FFB4A3;border-radius:14px;padding:12px 16px;font-size:14px}
@@ -113,12 +124,14 @@ const ICONS = {
   maison: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
   visage: '<circle cx="12" cy="10" r="4"/><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5"/><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3"/>',
   tableau: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 15l3-3 3 2 4-5"/>',
+  tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  box: '<rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 12.5h.01M11 12.5h.01M8 8l-2-4M16 8l2-4"/>',
   tablette: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M11 18h2"/>',
   garage: '<path d="M3 10.5L12 4l9 6.5V20H3z"/><path d="M7 20v-7.5h10V20M7 15h10M7 17.5h10"/>',
   monde: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   lien: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
 };
-const COLORS = { serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
+const COLORS = { tv: ['rgba(200,200,210,0.12)', '#D6D8DD'], box: ['rgba(200,200,210,0.12)', '#D6D8DD'], serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
 // Logos officiels : projet libre « dashboard-icons » (chargés depuis internet ; pictogramme générique si indisponible).
 const LOGOS = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 window.svgFor = (name) => svg(name, 28);
@@ -168,7 +181,17 @@ function logoHtml(s, size) {
 }
 const stateHtml = (s) => `<span class="state ${s.externe ? '' : s.ok === true ? 'ok' : s.ok === false ? 'ko' : ''}"><i></i><span>${s.externe ? 'cloud' : s.ok === true ? 'en ligne' : s.ok === false ? 'hors ligne' : ''}</span></span>`;
 const host = (u) => { try { const x = new URL(u); return x.host; } catch (e) { return ''; } };
-let lastData = null;
+let lastData = null, reseau = null, reseauT = 0;
+async function loadReseau() { try { reseau = await (await fetch('/api/reseau', { cache: 'no-store' })).json(); reseauT = Date.now(); drawNet(); } catch (e) { /* noop */ } }
+function scanHtml(sv) {
+  if (!reseau || !reseau.appareils || !reseau.appareils.length) return `<div class="scan"><div class="lbl">Appareils détectés sur le réseau</div><p class="sub">${reseau ? 'Balayage du réseau en cours (environ 1 minute)…' : 'Chargement…'}</p></div>`;
+  const known = {};
+  sv.forEach((s) => { const h = host(s.url || '').split(':')[0]; if (h) known[h] = s.nom; });
+  known['192.168.86.1'] = 'Google Wifi (routeur)';
+  const rows = reseau.appareils.map((a) => `<tr><td><code>${esc(a.ip)}</code></td><td class="${known[a.ip] ? 'k' : ''}">${esc(known[a.ip] || a.nom || '—')}</td><td>${esc(a.fabricant || 'inconnu')}</td><td><code>${esc(a.mac || '')}</code></td></tr>`).join('');
+  const quand = reseau.t ? new Date(reseau.t * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div class="scan"><div class="lbl" style="margin-bottom:8px">Appareils détectés sur le réseau · ${reseau.appareils.length} · balayage de ${quand}</div><div class="scan-wrap"><table><thead><tr><th>Adresse</th><th>Appareil</th><th>Fabricant</th><th>Adresse MAC</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
 function drawNet() {
   const d = lastData; if (!d) return;
   const sv = d.services || [], n = d.noeud || {};
@@ -176,6 +199,7 @@ function drawNet() {
   const guests = sv.filter((s) => s.vmid != null);
   (d.machines || []).forEach((m) => { if (!guests.some((g) => g.vmid === m.vmid)) guests.push({ nom: m.name, vmid: m.vmid, icone: 'serveur', url: '' }); });
   const devs = sv.filter((s) => !s.noeud && s.vmid == null && s.id !== 'nabu');
+  devs.sort((a, b) => (a.externe ? 1 : 0) - (b.externe ? 1 : 0));
   const g = guests.map((s) => {
     const m = (d.machines || []).find((x) => x.vmid === s.vmid);
     const lxc = m ? m.type === 'lxc' : true;
@@ -186,7 +210,11 @@ function drawNet() {
   $('net').innerHTML = `
     <div class="node">${logoHtml({ icone: 'monde' }, 20)}<div><b>Internet</b><small>Accès à distance : Nabu Casa</small></div></div>
     <div class="vline"></div>
-    <div class="node">${logoHtml({ icone: 'lien', logo: 'google-wifi' }, 20)}<div><b>Box Google Wifi</b><code>192.168.86.1</code><small>Routeur et Wi-Fi · réseau 192.168.86.x</small></div></div>
+    <div class="node">${logoHtml({ icone: 'box' }, 20)}<div><b>Box internet (opérateur)</b><small>Fibre / ADSL · adresse publique</small></div></div>
+    <div class="vline"></div>
+    <div class="vlan">
+    <div class="vlan-h"><b>Réseau de la maison · ${esc((reseau && reseau.sous_reseau) || '192.168.86.0/24')}</b><span>Aucun VLAN : un seul réseau pour tous les appareils (le Google Wifi ne gère pas les VLAN)</span></div>
+    <div class="node">${logoHtml({ icone: 'lien', logo: 'google-wifi' }, 20)}<div><b>Google Wifi</b><code>192.168.86.1</code><small>Routeur principal, DHCP et Wi-Fi maillé</small></div></div>
     <div class="vline"></div>
     <div class="branches">
       <div class="host">
@@ -194,10 +222,13 @@ function drawNet() {
         <div class="lbl">Machines hébergées</div>
         <div class="guests">${g}</div>
       </div>
-      <div class="wifi"><div class="lbl">Autres appareils</div><div class="devs">${dv}</div></div>
+      <div class="wifi"><div class="lbl">Objets connus</div><div class="devs">${dv}</div></div>
+    </div>
+    ${scanHtml(sv)}
     </div>`;
 }
-$('gear').addEventListener('click', () => { $('ov').hidden = false; drawNet(); });
+$('gear').addEventListener('click', () => { $('ov').hidden = false; drawNet(); loadReseau(); });
+setInterval(() => { if (!$('ov').hidden) loadReseau(); }, 60000);
 $('ovx').addEventListener('click', () => { $('ov').hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('ov').hidden = true; });
 

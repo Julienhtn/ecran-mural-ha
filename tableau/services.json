@@ -67,5 +67,13 @@
     "tuile": false,
     "externe": true,
     "note": "Sonnette, caméra jardin, thermostat (via le cloud)"
+  },
+  {
+    "id": "appletv",
+    "nom": "Apple TV",
+    "icone": "tv",
+    "logo": "apple-tv",
+    "tuile": false,
+    "note": "Salon"
   }
 ]

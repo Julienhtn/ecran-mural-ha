@@ -63,6 +63,61 @@ def verifier_services():
         time.sleep(15)
 
 
+# Inventaire du réseau : balayage de 192.168.86.1-254 toutes les 10 min (connexion TCP rapide pour
+# remplir la table ARP), puis lecture de /proc/net/arp. Nom : DNS inverse ; fabricant : préfixe MAC.
+RESEAU = {"t": 0, "appareils": [], "sous_reseau": None}
+OUI = {
+    "001788": "Philips Hue (Signify)", "ECB5FA": "Philips Hue (Signify)",
+    "7C2C67": "Shelly", "3C6105": "Espressif (objet connecté)", "A4CF12": "Espressif (objet connecté)", "8CAAB5": "Espressif (objet connecté)",
+    "70EE50": "Netatmo", "BC2411": "Proxmox (machine virtuelle)",
+    "F4F5D8": "Google", "F4F5E8": "Google", "3C5AB4": "Google", "1C53F9": "Google", "CCF411": "Google", "F88FCA": "Google", "D8EB46": "Google",
+    "B827EB": "Raspberry Pi", "DCA632": "Raspberry Pi", "E45F01": "Raspberry Pi",
+    "00113D": "Dell", "F8BC12": "Dell", "6C2B59": "Dell", "8CEC4B": "Dell", "B04F13": "Dell",
+    "000E58": "Sonos", "5CAAFD": "Sonos", "B8E937": "Sonos",
+}
+
+
+def _sonder(ip):
+    try:
+        with socket.create_connection((ip, 80), timeout=0.4):
+            pass
+    except OSError:
+        pass
+
+
+def scanner_reseau():
+    from concurrent.futures import ThreadPoolExecutor
+    while True:
+        try:
+            ip_local = socket.gethostbyname(socket.gethostname())
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as so:
+                so.connect(("192.168.86.1", 53))
+                ip_local = so.getsockname()[0]
+            base = ".".join(ip_local.split(".")[:3])
+            with ThreadPoolExecutor(64) as ex:
+                list(ex.map(_sonder, [f"{base}.{i}" for i in range(1, 255)]))
+            vus = []
+            with open("/proc/net/arp") as f:
+                for ligne in f.readlines()[1:]:
+                    c = ligne.split()
+                    if len(c) < 4 or c[2] == "0x0" or c[3] == "00:00:00:00:00:00" or not c[0].startswith(base + "."):
+                        continue
+                    mac = c[3].upper()
+                    pref = mac.replace(":", "")[:6]
+                    prive = int(pref[1], 16) & 2 == 2
+                    try:
+                        nom = socket.gethostbyaddr(c[0])[0].split(".")[0]
+                    except OSError:
+                        nom = None
+                    vus.append({"ip": c[0], "mac": mac, "nom": nom, "fabricant": OUI.get(pref) or ("Adresse privée (téléphone, tablette…)" if prive else None)})
+            vus.append({"ip": ip_local, "mac": None, "nom": "tableau", "fabricant": "Ce tableau de bord"})
+            vus.sort(key=lambda a: tuple(int(x) for x in a["ip"].split(".")))
+            RESEAU.update(t=time.time(), appareils=vus, sous_reseau=base + ".0/24")
+        except Exception as e:  # le balayage n'est qu'un plus : on réessaie plus tard
+            RESEAU["erreur"] = str(e)[:200]
+        time.sleep(600)
+
+
 CACHE = {"t": 0, "data": None}
 VERROU = threading.Lock()
 
@@ -121,6 +176,8 @@ class Gestion(BaseHTTPRequestHandler):
         if chemin in ("/", "/index.html"):
             with open(os.path.join(ICI, "index.html"), "rb") as f:
                 return self._envoyer(200, f.read(), "text/html; charset=utf-8")
+        if chemin == "/api/reseau":
+            return self._envoyer(200, json.dumps(RESEAU), "application/json")
         if chemin == "/api/etat":
             return self._envoyer(200, json.dumps(etat()), "application/json")
         return self._envoyer(404, "Introuvable", "text/plain; charset=utf-8")
@@ -128,4 +185,5 @@ class Gestion(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     threading.Thread(target=verifier_services, daemon=True).start()
+    threading.Thread(target=scanner_reseau, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Gestion).serve_forever()
