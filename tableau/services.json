@@ -1,8 +1,49 @@
 [
-  { "id": "proxmox", "nom": "Proxmox", "url": "https://192.168.86.10:8006", "icone": "serveur" },
-  { "id": "ha", "nom": "Home Assistant", "url": "http://192.168.86.11", "icone": "maison" },
-  { "id": "visages", "nom": "Visages", "url": "http://192.168.86.12:8099", "icone": "visage" },
-  { "id": "tablette", "nom": "Tablette (Fully)", "url": "http://192.168.86.15:2323", "icone": "tablette" },
-  { "id": "garage", "nom": "Porte du garage", "url": "http://192.168.86.22", "icone": "garage" },
-  { "id": "nabu", "nom": "Home Assistant à distance", "url": "https://o97aox8zpnz8waqxjuajcqe2kbvi7qsu.ui.nabu.casa", "icone": "monde", "externe": true }
+  {
+    "id": "proxmox",
+    "nom": "Proxmox",
+    "url": "https://192.168.86.10:8006",
+    "icone": "serveur",
+    "noeud": true
+  },
+  {
+    "id": "ha",
+    "nom": "Home Assistant",
+    "url": "http://192.168.86.11",
+    "icone": "maison",
+    "vmid": 100
+  },
+  {
+    "id": "visages",
+    "nom": "Visages",
+    "url": "http://192.168.86.12:8099",
+    "icone": "visage",
+    "vmid": 110
+  },
+  {
+    "id": "tableau",
+    "nom": "Tableau de bord",
+    "url": "http://192.168.86.100",
+    "icone": "tableau",
+    "vmid": 120
+  },
+  {
+    "id": "tablette",
+    "nom": "Tablette (Fully)",
+    "url": "http://192.168.86.15:2323",
+    "icone": "tablette"
+  },
+  {
+    "id": "garage",
+    "nom": "Porte du garage",
+    "url": "http://192.168.86.22",
+    "icone": "garage"
+  },
+  {
+    "id": "nabu",
+    "nom": "Home Assistant à distance",
+    "url": "https://o97aox8zpnz8waqxjuajcqe2kbvi7qsu.ui.nabu.casa",
+    "icone": "monde",
+    "externe": true
+  }
 ]
