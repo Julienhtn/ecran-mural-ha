@@ -236,7 +236,7 @@ function drawNet() {
   node('inet', 570, 24, 160, 54, 'Internet', 'WAN', 'monde');
   node('box', 550, 122, 200, 58, 'Box opérateur', 'IP publique · NAT', 'box');
   node('nabu', 250, 122, 240, 58, 'Nabu Casa', 'Accès à distance à HA', 'monde');
-  node('gw', 520, 236, 260, 64, 'Google Wifi', '192.168.86.1 · routeur · DHCP', 'lien', { accent: '#9CC2FF' });
+  node('gw', 520, 236, 260, 64, 'Google Wifi', '192.168.86.1 · routeur · + point .57', 'lien', { accent: '#9CC2FF' });
   node('sw', 550, 346, 200, 56, 'Switch 1 Gb', '3 ports utilisés', 'switch', { accent: '#C9CBD0' });
   // Filaire : Proxmox à gauche, Apple TV et pont Hue côte à côte
   node('pve', 56, 490, 528, 62, 'Proxmox VE · Dell OptiPlex 3000', `${ipOf(S('proxmox')) || '192.168.86.10'} · ${(n.modele || 'Celeron N5105').replace(/\(R\)|\(TM\)|CPU|Intel|@.*$/g, '').replace(/\s+/g, ' ').trim()} · CPU ${n.cpu != null ? Math.round(n.cpu * 100) + ' %' : '–'} · RAM ${n.memTotal ? Math.round(pct(n.mem, n.memTotal) * 100) + ' %' : '–'}`, 'serveur', { accent: '#FF9A5C', ok: S('proxmox').ok });

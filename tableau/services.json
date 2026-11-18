@@ -60,7 +60,8 @@
     "note": "Lumières, détecteur de mouvement",
     "match": {
       "fabricant": "Hue|Signify"
-    }
+    },
+    "ip": "192.168.86.201"
   },
   {
     "id": "appletv",
@@ -68,41 +69,47 @@
     "icone": "tv",
     "logo": "apple-tv",
     "tuile": false,
-    "note": "Salon"
+    "note": "Salon",
+    "ip": "192.168.86.21"
   },
   {
     "id": "avosdim",
     "nom": "Box Avosdim",
     "icone": "volet",
     "tuile": false,
-    "note": "Volets roulants"
+    "note": "Volets roulants",
+    "ip": "192.168.86.195"
   },
   {
     "id": "chromecast",
     "nom": "Google Chromecast",
     "icone": "hifi",
     "tuile": false,
-    "note": "Chaîne hi-fi"
+    "note": "Chaîne hi-fi",
+    "ip": "192.168.86.250"
   },
   {
     "id": "homemini",
     "nom": "Google Home Mini",
     "icone": "mini",
     "tuile": false,
-    "note": "Enceinte et assistant vocal"
+    "note": "Enceinte et assistant vocal",
+    "ip": "192.168.86.240"
   },
   {
     "id": "sonnette",
     "nom": "Sonnette Netatmo",
     "icone": "sonnette",
     "tuile": false,
-    "note": "Entrée · via le cloud Netatmo"
+    "note": "Entrée · via le cloud Netatmo",
+    "ip": "192.168.86.31"
   },
   {
     "id": "camjardin",
     "nom": "Caméra jardin Netatmo",
     "icone": "camera",
     "tuile": false,
-    "note": "Jardin · via le cloud Netatmo"
+    "note": "Jardin · via le cloud Netatmo",
+    "ip": "192.168.86.23"
   }
 ]

@@ -71,6 +71,7 @@ OUI = {
     "7C2C67": "Shelly", "3C6105": "Espressif (objet connecté)", "A4CF12": "Espressif (objet connecté)", "8CAAB5": "Espressif (objet connecté)",
     "70EE50": "Netatmo", "BC2411": "Proxmox (machine virtuelle)",
     "F4F5D8": "Google", "F4F5E8": "Google", "3C5AB4": "Google", "1C53F9": "Google", "CCF411": "Google", "F88FCA": "Google", "D8EB46": "Google",
+    "703ACB": "Google (Google Wifi)", "48D6D5": "Google", "546009": "Google", "246F28": "Espressif (objet connecté)", "8C26AA": "Apple", "B4FA48": "Apple",
     "B827EB": "Raspberry Pi", "DCA632": "Raspberry Pi", "E45F01": "Raspberry Pi",
     "00113D": "Dell", "F8BC12": "Dell", "6C2B59": "Dell", "8CEC4B": "Dell", "B04F13": "Dell",
     "000E58": "Sonos", "5CAAFD": "Sonos", "B8E937": "Sonos",
