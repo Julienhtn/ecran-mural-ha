@@ -112,7 +112,7 @@ footer{color:var(--faint);font-size:12px;text-align:center}
   </header>
   <div class="err" id="err" hidden></div>
   <div class="tiles" id="tiles"></div>
-  <footer>Mis à jour toutes les 2 secondes · <span id="maj">–</span></footer>
+  <footer>Données relevées au chargement de la page · <span id="maj">–</span> · rechargez la page pour les actualiser</footer>
 </div>
 <button class="gear" id="gear" type="button" aria-label="Afficher le schéma du réseau"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 <div class="ov" id="ov" hidden role="dialog" aria-modal="true" aria-label="Schéma du réseau">
@@ -305,8 +305,7 @@ function drawNet() {
   $('net').innerHTML = `<div class="arch-wrap">${s}</div>${scanHtml(sv)}`;
   $('legend').innerHTML = Object.values(L).map((t) => `<span><i style="border-color:${t[0]};${t[1] ? 'border-top-style:dashed' : ''}"></i>${t[2]}</span>`).join('');
 }
-$('gear').addEventListener('click', () => { $('ov').hidden = false; drawNet(); loadReseau(); });
-setInterval(() => { if (!$('ov').hidden) loadReseau(); }, 60000);
+$('gear').addEventListener('click', () => { $('ov').hidden = false; drawNet(); });
 $('ovx').addEventListener('click', () => { $('ov').hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('ov').hidden = true; });
 
@@ -346,11 +345,11 @@ function render(d) {
 
 async function tick() {
   try { const r = await fetch('/api/etat', { cache: 'no-store' }); render(await r.json()); }
-  catch (e) { $('err').hidden = false; $('err').textContent = 'Le tableau de bord ne répond plus. Nouvel essai dans 2 secondes.'; }
+  catch (e) { $('err').hidden = false; $('err').textContent = 'Le tableau de bord ne répond pas. Rechargez la page.'; }
 }
 function clock() { $('clock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
 clock(); setInterval(clock, 5000);
-tick(); setInterval(tick, 2000);
+tick(); loadReseau();
 </script>
 </body>
 </html>
