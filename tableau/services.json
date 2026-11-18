@@ -57,7 +57,10 @@
     "icone": "lien",
     "logo": "philips-hue",
     "tuile": false,
-    "note": "Lumières, détecteur de mouvement"
+    "note": "Lumières, détecteur de mouvement",
+    "match": {
+      "fabricant": "Hue|Signify"
+    }
   },
   {
     "id": "appletv",

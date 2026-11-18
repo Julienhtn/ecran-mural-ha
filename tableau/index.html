@@ -198,7 +198,8 @@ async function loadReseau() { try { reseau = await (await fetch('/api/reseau', {
 function scanHtml(sv) {
   if (!reseau || !reseau.appareils || !reseau.appareils.length) return `<div class="scan"><div class="lbl">Appareils détectés sur le réseau</div><p class="sub">${reseau ? 'Balayage du réseau en cours (environ 1 minute)…' : 'Chargement…'}</p></div>`;
   const known = {};
-  sv.forEach((s) => { const h = host(s.url || '').split(':')[0]; if (h) known[h] = s.nom; });
+  sv.forEach((s) => { const h = host(s.url || '').split(':')[0] || s.ip; if (h) known[h] = s.nom; });
+  sv.filter((s) => s.match && !s.ip).forEach((s) => { const a = reseau.appareils.find((x) => Object.entries(s.match).every(([k, re]) => new RegExp(re, 'i').test(x[k] || ''))); if (a && !known[a.ip]) known[a.ip] = s.nom; });
   known['192.168.86.1'] = 'Google Wifi (routeur)';
   const rows = reseau.appareils.map((a) => `<tr><td><code>${esc(a.ip)}</code></td><td class="${known[a.ip] ? 'k' : ''}">${esc(known[a.ip] || a.nom || '—')}</td><td>${esc(a.fabricant || 'inconnu')}</td><td><code>${esc(a.mac || '')}</code></td></tr>`).join('');
   const quand = reseau.t ? new Date(reseau.t * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -220,7 +221,17 @@ function drawNet() {
   const edges = [];
   const path = (pts, type, label, lx, ly) => edges.push({ d: 'M' + pts.map((p) => p.join(',')).join(' L'), type, label, lx, ly });
   const lab = (label, type, lx, ly) => edges.push({ label, type, lx, ly, only: true });
-  const sub2 = (sid, txt) => { const ip = ipOf(S(sid)); return ip ? ip + ' · ' + txt : txt; };
+  // Appareil sans page web : adresse fixée (« ip ») ou repérée dans le balayage (« match ») ; en ligne = vu au dernier balayage.
+  const found = (s) => {
+    if (!reseau || !reseau.appareils) return null;
+    const ap = reseau.appareils;
+    if (s.ip) return ap.find((a) => a.ip === s.ip) || false;
+    if (s.match) return ap.find((a) => Object.entries(s.match).every(([k, re]) => new RegExp(re, 'i').test(a[k] || ''))) || false;
+    return null;
+  };
+  const ipOf2 = (s) => ipOf(s) || s.ip || ((found(s) || {}).ip) || '';
+  const okOf = (s) => { if (s.url && !s.externe) return s.ok; const f = found(s); return f === null ? null : !!f; };
+  const sub2 = (sid, txt) => { const ip = ipOf2(S(sid)); return ip ? ip + ' · ' + txt : txt; };
   // Colonne centrale : internet → box → Google Wifi → switch (axe x = 650)
   node('inet', 570, 24, 160, 54, 'Internet', 'WAN', 'monde');
   node('box', 550, 122, 200, 58, 'Box opérateur', 'IP publique · NAT', 'box');
@@ -234,12 +245,12 @@ function drawNet() {
     const m = M(vmid), s = S(sid), on = m && m.status === 'running';
     node('g' + vmid, 56 + i * 182, 640, 164, 92, nom, `${ipOf(s) || '–'}`, ic, { accent: c, ok: m ? on : null, tag: `${m ? (m.type === 'lxc' ? 'LXC' : 'VM') : '—'} ${vmid}`, extra: on ? `${Math.round((m.cpu || 0) * 100)} % · ${Gn(m.mem)}/${Go(m.maxmem)}` : (m ? 'arrêtée' : 'à installer') });
   });
-  node('appletv', 624, 490, 170, 62, 'Apple TV', sub2('appletv', 'Salon'), 'tv', { ok: null });
-  node('hue', 808, 490, 170, 62, 'Pont Hue', sub2('hue', 'Passerelle'), 'lien', { ok: null });
+  node('appletv', 624, 490, 170, 62, 'Apple TV', sub2('appletv', 'Salon'), 'tv', { ok: okOf(S('appletv')) });
+  node('hue', 808, 490, 170, 62, 'Pont Hue', sub2('hue', 'Passerelle'), 'lien', { ok: okOf(S('hue')) });
   node('lampes', 808, 640, 170, 62, 'Lampes Hue', 'et détecteur', 'bulb', { ok: null });
   // Wi-Fi : pile à droite
   const wifi = [['tablette', 'Tablette entrée', 'Fully Kiosk', 'tablette'], ['sonnette', 'Sonnette Netatmo', 'Entrée · cloud', 'sonnette'], ['camjardin', 'Caméra jardin', 'Netatmo · cloud', 'camera'], ['garage', 'Shelly 1 Gen4', 'Garage', 'garage'], ['avosdim', 'Box Avosdim', 'Volets roulants', 'volet'], ['chromecast', 'Google Chromecast', 'Chaîne hi-fi', 'hifi'], ['homemini', 'Google Home Mini', 'Enceinte', 'mini']];
-  wifi.forEach(([sid, nom, sub, ic], i) => { const s = S(sid); node(sid, 1030, 330 + i * 74, 260, 58, nom, sub2(sid, sub), ic, { ok: s.url && !s.externe ? s.ok : null }); });
+  wifi.forEach(([sid, nom, sub, ic], i) => { const s = S(sid); node(sid, 1030, 330 + i * 74, 260, 58, nom, sub2(sid, sub), ic, { ok: okOf(s) }); });
 
   // Liaisons : colonne centrale
   const [ix, iy] = C('inet', 'b'), [bx, by] = C('box', 't'); path([[ix, iy], [bx, by]], 'fibre', 'Fibre', ix + 10, (iy + by) / 2 + 4);

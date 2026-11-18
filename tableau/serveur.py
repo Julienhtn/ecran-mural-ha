@@ -115,7 +115,7 @@ def scanner_reseau():
             RESEAU.update(t=time.time(), appareils=vus, sous_reseau=base + ".0/24")
         except Exception as e:  # le balayage n'est qu'un plus : on réessaie plus tard
             RESEAU["erreur"] = str(e)[:200]
-        time.sleep(600)
+        time.sleep(180)
 
 
 CACHE = {"t": 0, "data": None}
