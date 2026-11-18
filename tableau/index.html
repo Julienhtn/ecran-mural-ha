@@ -135,13 +135,15 @@ const ICONS = {
   hifi: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><circle cx="12" cy="14.5" r="3.5"/><circle cx="12" cy="7.5" r="1.4"/>',
   mini: '<ellipse cx="12" cy="13" rx="9" ry="5"/><path d="M3 13v1.5c0 2.8 4 5 9 5s9-2.2 9-5V13"/><path d="M8.5 12.5h.01M11 12.5h.01M13.5 12.5h.01M16 12.5h.01"/>',
   switch: '<rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 12h.01M9 12h.01M12 12h.01M15 12h.01M18 12h.01"/>',
+  sonnette: '<rect x="7" y="2.5" width="10" height="19" rx="5"/><circle cx="12" cy="8" r="2.2"/><circle cx="12" cy="15.5" r="1.6"/>',
+  camera: '<rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/>',
   bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
   tablette: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M11 18h2"/>',
   garage: '<path d="M3 10.5L12 4l9 6.5V20H3z"/><path d="M7 20v-7.5h10V20M7 15h10M7 17.5h10"/>',
   monde: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   lien: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
 };
-const COLORS = { volet: ['rgba(200,200,210,0.12)', '#D6D8DD'], hifi: ['rgba(200,200,210,0.12)', '#D6D8DD'], mini: ['rgba(200,200,210,0.12)', '#D6D8DD'], tv: ['rgba(200,200,210,0.12)', '#D6D8DD'], box: ['rgba(200,200,210,0.12)', '#D6D8DD'], serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
+const COLORS = { sonnette: ['rgba(200,200,210,0.12)', '#D6D8DD'], camera: ['rgba(200,200,210,0.12)', '#D6D8DD'], volet: ['rgba(200,200,210,0.12)', '#D6D8DD'], hifi: ['rgba(200,200,210,0.12)', '#D6D8DD'], mini: ['rgba(200,200,210,0.12)', '#D6D8DD'], tv: ['rgba(200,200,210,0.12)', '#D6D8DD'], box: ['rgba(200,200,210,0.12)', '#D6D8DD'], serveur: ['rgba(255,138,76,0.14)', '#FF9A5C'], maison: ['rgba(65,189,245,0.14)', '#5CC8FF'], visage: ['rgba(177,151,255,0.14)', '#B9A8FF'], tableau: ['rgba(242,181,68,0.14)', '#F2B544'], tablette: ['rgba(242,181,68,0.14)', '#F2B544'], garage: ['rgba(61,214,140,0.14)', '#3DD68C'], monde: ['rgba(127,176,255,0.14)', '#9CC2FF'] };
 // Logos officiels : projet libre « dashboard-icons » (chargés depuis internet ; pictogramme générique si indisponible).
 const LOGOS = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 window.svgFor = (name) => svg(name, 28);
@@ -211,7 +213,7 @@ function drawNet() {
   const dot = (ok) => ok === true ? '#3DD68C' : ok === false ? '#FF6B4A' : '#5A606E';
   // Liaisons : couleur et tirets par type
   const L = { fibre: ['#F2B544', '', 'Fibre'], eth: ['#9AA0AC', '', 'Ethernet'], wifi: ['#7FB0FF', '6 5', 'Wi-Fi'], zigbee: ['#3DD68C', '2 4', 'Zigbee'], cloud: ['#B9A8FF', '8 6', 'Internet (cloud)'], virt: ['#FF9A5C', '', 'Pont virtuel vmbr0'] };
-  const W = 1300, H = 880;
+  const W = 1320, H = 940;
   const nodes = {}, out = [];
   const node = (id, x, y, w, h, title, sub, ic, o = {}) => { nodes[id] = { x, y, w, h }; out.push({ id, x, y, w, h, title, sub, ic, ...o }); };
   const C = (id, side) => { const b = nodes[id]; return side === 't' ? [b.x + b.w / 2, b.y] : side === 'b' ? [b.x + b.w / 2, b.y + b.h] : side === 'l' ? [b.x, b.y + b.h / 2] : [b.x + b.w, b.y + b.h / 2]; };
@@ -219,55 +221,59 @@ function drawNet() {
   const path = (pts, type, label, lx, ly) => edges.push({ d: 'M' + pts.map((p) => p.join(',')).join(' L'), type, label, lx, ly });
   const lab = (label, type, lx, ly) => edges.push({ label, type, lx, ly, only: true });
   const sub2 = (sid, txt) => { const ip = ipOf(S(sid)); return ip ? ip + ' · ' + txt : txt; };
-  // Colonne centrale : internet → box → Google Wifi → switch
+  // Colonne centrale : internet → box → Google Wifi → switch (axe x = 650)
   node('inet', 570, 24, 160, 54, 'Internet', 'WAN', 'monde');
   node('box', 550, 122, 200, 58, 'Box opérateur', 'IP publique · NAT', 'box');
+  node('nabu', 250, 122, 240, 58, 'Nabu Casa', 'Accès à distance à HA', 'monde');
   node('gw', 520, 236, 260, 64, 'Google Wifi', '192.168.86.1 · routeur · DHCP', 'lien', { accent: '#9CC2FF' });
-  node('sw', 550, 346, 200, 56, 'Switch 1 Gb', 'Ethernet', 'switch', { accent: '#C9CBD0' });
-  node('nabu', 270, 122, 240, 58, 'Nabu Casa', 'Accès à distance à HA', 'monde');
-  node('netatmo', 990, 122, 270, 58, 'Netatmo', 'Sonnette · caméra · thermostat', 'monde');
-  // Hôte Proxmox (à gauche, relié au switch)
-  node('pve', 56, 486, 528, 62, 'Proxmox VE · Dell OptiPlex 3000', `${ipOf(S('proxmox')) || '192.168.86.10'} · ${(n.modele || 'Celeron N5105').replace(/\(R\)|\(TM\)|CPU|Intel|@.*$/g, '').replace(/\s+/g, ' ').trim()} · CPU ${n.cpu != null ? Math.round(n.cpu * 100) + ' %' : '–'} · RAM ${n.memTotal ? Math.round(pct(n.mem, n.memTotal) * 100) + ' %' : '–'}`, 'serveur', { accent: '#FF9A5C', ok: S('proxmox').ok });
+  node('sw', 550, 346, 200, 56, 'Switch 1 Gb', '3 ports utilisés', 'switch', { accent: '#C9CBD0' });
+  // Filaire : Proxmox à gauche, Apple TV et pont Hue côte à côte
+  node('pve', 56, 490, 528, 62, 'Proxmox VE · Dell OptiPlex 3000', `${ipOf(S('proxmox')) || '192.168.86.10'} · ${(n.modele || 'Celeron N5105').replace(/\(R\)|\(TM\)|CPU|Intel|@.*$/g, '').replace(/\s+/g, ' ').trim()} · CPU ${n.cpu != null ? Math.round(n.cpu * 100) + ' %' : '–'} · RAM ${n.memTotal ? Math.round(pct(n.mem, n.memTotal) * 100) + ' %' : '–'}`, 'serveur', { accent: '#FF9A5C', ok: S('proxmox').ok });
   const guests = [[100, 'ha', 'Home Assistant', 'maison', '#5CC8FF'], [110, 'visages', 'Visages', 'visage', '#B9A8FF'], [120, 'tableau', 'Tableau de bord', 'tableau', '#B9A8FF']];
   guests.forEach(([vmid, sid, nom, ic, c], i) => {
     const m = M(vmid), s = S(sid), on = m && m.status === 'running';
-    node('g' + vmid, 56 + i * 182, 636, 164, 92, nom, `${ipOf(s) || '–'}`, ic, { accent: c, ok: m ? on : null, tag: `${m ? (m.type === 'lxc' ? 'LXC' : 'VM') : '—'} ${vmid}`, extra: on ? `${Math.round((m.cpu || 0) * 100)} % · ${Gn(m.mem)}/${Go(m.maxmem)}` : (m ? 'arrêtée' : 'à installer') });
+    node('g' + vmid, 56 + i * 182, 640, 164, 92, nom, `${ipOf(s) || '–'}`, ic, { accent: c, ok: m ? on : null, tag: `${m ? (m.type === 'lxc' ? 'LXC' : 'VM') : '—'} ${vmid}`, extra: on ? `${Math.round((m.cpu || 0) * 100)} % · ${Gn(m.mem)}/${Go(m.maxmem)}` : (m ? 'arrêtée' : 'à installer') });
   });
-  // Appareils en Ethernet (centre, reliés au switch)
-  node('appletv', 660, 486, 250, 60, 'Apple TV', sub2('appletv', 'Salon'), 'tv', { ok: null });
-  node('hue', 660, 572, 250, 60, 'Pont Philips Hue', sub2('hue', 'Passerelle Zigbee'), 'lien', { ok: null });
-  node('lampes', 660, 682, 250, 58, 'Lampes et détecteur Hue', 'Réseau Zigbee', 'bulb', { ok: null });
-  // Appareils en Wi-Fi (à droite, empilés)
-  const wifi = [['tablette', 'Tablette entrée', 'Fully Kiosk', 'tablette'], ['garage', 'Shelly 1 Gen4', 'Porte du garage', 'garage'], ['avosdim', 'Box Avosdim', 'Volets roulants', 'volet'], ['chromecast', 'Google Chromecast', 'Chaîne hi-fi', 'hifi'], ['homemini', 'Google Home Mini', 'Enceinte', 'mini']];
-  wifi.forEach(([sid, nom, sub, ic], i) => { const s = S(sid); node(sid, 990, 346 + i * 80, 270, 60, nom, sub2(sid, sub), ic, { ok: s.url && !s.externe ? s.ok : null }); });
+  node('appletv', 624, 490, 170, 62, 'Apple TV', sub2('appletv', 'Salon'), 'tv', { ok: null });
+  node('hue', 808, 490, 170, 62, 'Pont Hue', sub2('hue', 'Passerelle'), 'lien', { ok: null });
+  node('lampes', 808, 640, 170, 62, 'Lampes Hue', 'et détecteur', 'bulb', { ok: null });
+  // Wi-Fi : pile à droite
+  const wifi = [['tablette', 'Tablette entrée', 'Fully Kiosk', 'tablette'], ['sonnette', 'Sonnette Netatmo', 'Entrée · cloud', 'sonnette'], ['camjardin', 'Caméra jardin', 'Netatmo · cloud', 'camera'], ['garage', 'Shelly 1 Gen4', 'Garage', 'garage'], ['avosdim', 'Box Avosdim', 'Volets roulants', 'volet'], ['chromecast', 'Google Chromecast', 'Chaîne hi-fi', 'hifi'], ['homemini', 'Google Home Mini', 'Enceinte', 'mini']];
+  wifi.forEach(([sid, nom, sub, ic], i) => { const s = S(sid); node(sid, 1030, 330 + i * 74, 260, 58, nom, sub2(sid, sub), ic, { ok: s.url && !s.externe ? s.ok : null }); });
 
-  // Liaisons
+  // Liaisons : colonne centrale
   const [ix, iy] = C('inet', 'b'), [bx, by] = C('box', 't'); path([[ix, iy], [bx, by]], 'fibre', 'Fibre', ix + 10, (iy + by) / 2 + 4);
   const [b2x, b2y] = C('box', 'b'), [gx, gy] = C('gw', 't'); path([[b2x, b2y], [gx, gy]], 'eth', 'Ethernet', b2x + 10, (b2y + gy) / 2 + 4);
   const [g2x, g2y] = C('gw', 'b'), [sx, sy] = C('sw', 't'); path([[g2x, g2y], [sx, sy]], 'eth', '1 Gb', g2x + 10, (g2y + sy) / 2 + 4);
-  const [swx, swy] = C('sw', 'b');
-  const [px, py] = C('pve', 't'); path([[swx, swy], [swx, 446], [px, 446], [px, py]], 'eth', '', 0, 0);
-  lab('Ethernet 1 Gb', 'eth', px + 10, 470);
-  ['appletv', 'hue'].forEach((id) => { const [lx, ly] = C(id, 'l'); path([[swx, swy], [swx, 446], [636, 446], [636, ly], [lx, ly]], 'eth', '', 0, 0); });
-  const [pbx, pby] = C('pve', 'b');
-  guests.forEach(([vmid]) => { const [tx, ty] = C('g' + vmid, 't'); path([[pbx, pby], [pbx, 600], [tx, 600], [tx, ty]], 'virt', '', 0, 0); });
-  lab('vmbr0 · pont virtuel', 'virt', pbx + 10, 595);
+  const [ilx, ily] = C('inet', 'l'), [nrx, nry] = C('nabu', 'r'); path([[ilx, ily], [nrx + 30, ily], [nrx + 30, nry], [nrx, nry]], 'cloud', '', 0, 0);
+  // Switch : un tronc, une barre horizontale, une descente droite par appareil
+  const [swx, swy] = C('sw', 'b'), BUS = 448;
+  const drops = ['pve', 'appletv', 'hue'].map((id) => C(id, 't'));
+  path([[swx, swy], [swx, BUS]], 'eth', '', 0, 0);
+  path([[Math.min(...drops.map((p) => p[0])), BUS], [Math.max(...drops.map((p) => p[0])), BUS]], 'eth', '', 0, 0);
+  drops.forEach(([x, y]) => path([[x, BUS], [x, y]], 'eth', '', 0, 0));
+  lab('Ethernet 1 Gb', 'eth', swx + 10, 434);
+  // Proxmox → machines : même principe
+  const [pbx, pby] = C('pve', 'b'), VB = 604;
+  const gd = guests.map(([vmid]) => C('g' + vmid, 't'));
+  path([[pbx, pby], [pbx, VB]], 'virt', '', 0, 0);
+  path([[gd[0][0], VB], [gd[gd.length - 1][0], VB]], 'virt', '', 0, 0);
+  gd.forEach(([x, y]) => path([[x, VB], [x, y]], 'virt', '', 0, 0));
+  lab('vmbr0 · pont virtuel', 'virt', pbx + 10, VB - 6);
   const [hbx, hby] = C('hue', 'b'), [lpx, lpy] = C('lampes', 't'); path([[hbx, hby], [lpx, lpy]], 'zigbee', 'Zigbee', hbx + 10, (hby + lpy) / 2 + 4);
-  const [grx, gry] = C('gw', 'r');
-  wifi.forEach(([sid]) => { const [lx, ly] = C(sid, 'l'); path([[grx, gry], [950, gry], [950, ly], [lx, ly]], 'wifi', '', 0, 0); });
+  // Wi-Fi : barre verticale, une branche horizontale par appareil
+  const [grx, gry] = C('gw', 'r'), WB = 1006;
+  const wl = wifi.map(([sid]) => C(sid, 'l'));
+  path([[grx, gry], [WB, gry], [WB, wl[wl.length - 1][1]]], 'wifi', '', 0, 0);
+  wl.forEach(([x, y]) => path([[WB, y], [x, y]], 'wifi', '', 0, 0));
   lab('Wi-Fi', 'wifi', 800, gry - 8);
-  const [ntx, nty] = C('netatmo', 'b'); path([[ntx, nty], [ntx, 214], [950, 214], [950, gry]], 'wifi', '', 0, 0);
-  const [irx, iry] = C('inet', 'r'), [nlx, nly] = C('netatmo', 'l'); path([[irx, iry], [nlx - 40, iry], [nlx - 40, nly], [nlx, nly]], 'cloud', '', 0, 0);
-  const [ilx, ily] = C('inet', 'l'), [nrx, nry] = C('nabu', 'r'); path([[ilx, ily], [nrx + 40, ily], [nrx + 40, nry], [nrx, nry]], 'cloud', '', 0, 0);
-  const zones = `<rect x="24" y="200" width="1252" height="664" rx="22" fill="rgba(61,214,140,0.025)" stroke="rgba(61,214,140,0.35)" stroke-dasharray="6 6"/>
+  const zones = `<rect x="24" y="200" width="1280" height="724" rx="22" fill="rgba(61,214,140,0.025)" stroke="rgba(61,214,140,0.35)" stroke-dasharray="6 6"/>
     <text x="44" y="226" font-size="12" font-weight="700" fill="#7BE2AE" letter-spacing="1.5">LAN 192.168.86.0/24</text>
     <text x="44" y="244" font-size="11" fill="#7F8592">Pas de VLAN · réseau unique</text>
-    <rect x="40" y="470" width="560" height="276" rx="18" fill="rgba(255,154,92,0.03)" stroke="rgba(255,154,92,0.45)"/>
-    <text x="56" y="766" font-size="11" fill="#B07A5C" letter-spacing="1.2">HÔTE PHYSIQUE</text>
-    <rect x="644" y="470" width="282" height="284" rx="18" fill="rgba(200,200,210,0.02)" stroke="rgba(200,200,210,0.25)"/>
-    <text x="660" y="774" font-size="11" fill="#8D919B" letter-spacing="1.2">FILAIRE</text>
-    <rect x="974" y="330" width="302" height="408" rx="18" fill="rgba(127,176,255,0.025)" stroke="rgba(127,176,255,0.35)" stroke-dasharray="4 5"/>
-    <text x="990" y="758" font-size="11" fill="#7F96BF" letter-spacing="1.2">WI-FI</text>`;
+    <rect x="40" y="474" width="560" height="276" rx="18" fill="rgba(255,154,92,0.03)" stroke="rgba(255,154,92,0.45)"/>
+    <text x="56" y="770" font-size="11" fill="#B07A5C" letter-spacing="1.2">HÔTE PHYSIQUE</text>
+    <rect x="1018" y="316" width="284" height="530" rx="18" fill="rgba(127,176,255,0.025)" stroke="rgba(127,176,255,0.35)" stroke-dasharray="4 5"/>
+    <text x="1034" y="866" font-size="11" fill="#7F96BF" letter-spacing="1.2">WI-FI</text>`;
   const ICO = (name, x, y, c) => `<g transform="translate(${x},${y})" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.lien}</g>`;
   let s = `<svg class="arch" viewBox="0 0 ${W} ${H}" role="img" aria-label="Schéma d'architecture du réseau de la maison">`;
   // Zones

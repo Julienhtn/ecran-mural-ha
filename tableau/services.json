@@ -60,15 +60,6 @@
     "note": "Lumières, détecteur de mouvement"
   },
   {
-    "id": "netatmo",
-    "nom": "Netatmo",
-    "icone": "monde",
-    "logo": "netatmo",
-    "tuile": false,
-    "externe": true,
-    "note": "Sonnette, caméra jardin, thermostat (via le cloud)"
-  },
-  {
     "id": "appletv",
     "nom": "Apple TV",
     "icone": "tv",
@@ -96,5 +87,19 @@
     "icone": "mini",
     "tuile": false,
     "note": "Enceinte et assistant vocal"
+  },
+  {
+    "id": "sonnette",
+    "nom": "Sonnette Netatmo",
+    "icone": "sonnette",
+    "tuile": false,
+    "note": "Entrée · via le cloud Netatmo"
+  },
+  {
+    "id": "camjardin",
+    "nom": "Caméra jardin Netatmo",
+    "icone": "camera",
+    "tuile": false,
+    "note": "Jardin · via le cloud Netatmo"
   }
 ]
