@@ -24,6 +24,39 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
 h1{margin:4px 0 0;font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-.02em}
 .sub{color:var(--mut);font-size:14px;margin-top:4px}
 .clock{font-family:var(--mono);font-size:clamp(28px,4vw,40px);font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.gear{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--mut);display:grid;place-items:center;cursor:pointer;z-index:5}
+.gear:hover,.gear:focus-visible{color:var(--accent);border-color:rgba(242,181,68,0.45);outline:none}
+.ov{position:fixed;inset:0;z-index:10;background:var(--bg);overflow:auto;padding-block:max(24px,env(safe-area-inset-top,0px)) 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ov-in{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.ov-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ov-head h2{margin:0;font-size:24px;font-weight:600}
+.x{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;display:grid;place-items:center}
+.net{display:flex;flex-direction:column;align-items:center}
+.node{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:var(--panel);border:1px solid var(--line);min-width:0}
+.node .ico{width:40px;height:40px;border-radius:11px}
+.node .ico .logo{width:24px;height:24px}
+.node b{display:block;font-size:15px;font-weight:600}
+.node code{display:block;font-family:var(--mono);font-size:12px;color:var(--faint)}
+.node small{display:block;font-size:12px;color:var(--mut)}
+.node .state{margin-left:auto;padding-left:10px}
+.vline{width:2px;height:28px;background:linear-gradient(var(--line),#3A3F4A)}
+.branches{width:100%;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:22px;position:relative;padding-top:28px}
+.branches::before{content:"";position:absolute;top:0;left:30%;right:20%;height:2px;background:#3A3F4A}
+.branches>div{position:relative}
+.branches>div::before{content:"";position:absolute;top:-28px;left:50%;width:2px;height:28px;background:#3A3F4A}
+.host{border:2px solid rgba(255,154,92,0.55);border-radius:20px;padding:16px;background:rgba(255,154,92,0.04);display:flex;flex-direction:column;gap:12px}
+.host-h{display:flex;align-items:center;gap:12px}
+.host-h b{display:block;font-size:17px;font-weight:600}
+.host-h code{display:block;font-family:var(--mono);font-size:12px;color:var(--faint)}
+.host-h small{display:block;font-size:12px;color:var(--mut)}
+.host-h .ico{width:44px;height:44px;border-radius:12px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.guests{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.guest{border-left:3px solid var(--gc,#5CC8FF)}
+.devs{display:flex;flex-direction:column;gap:10px}
+.wifi{border:2px dashed rgba(127,176,255,0.4);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--mut)}
+@media (max-width:760px){.branches{grid-template-columns:1fr;border-top:0;padding-top:0}.branches>div::before{display:none}.branches>div+div{margin-top:22px}}
 .err{border:1px solid rgba(255,107,74,0.4);background:rgba(255,107,74,0.08);color:#FFB4A3;border-radius:14px;padding:12px 16px;font-size:14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px}
 .tile{display:grid;grid-template-columns:56px minmax(0,1fr) auto;column-gap:16px;row-gap:14px;align-items:center;padding:18px 20px;border-radius:18px;background:var(--panel);border:1px solid var(--line);color:inherit;text-decoration:none;transition:transform .15s ease,border-color .2s ease}
@@ -64,6 +97,14 @@ footer{color:var(--faint);font-size:12px;text-align:center}
   <div class="err" id="err" hidden></div>
   <div class="tiles" id="tiles"></div>
   <footer>Mis à jour toutes les 2 secondes · <span id="maj">–</span></footer>
+</div>
+<button class="gear" id="gear" type="button" aria-label="Afficher le schéma du réseau"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+<div class="ov" id="ov" hidden role="dialog" aria-modal="true" aria-label="Schéma du réseau">
+  <div class="ov-in">
+    <div class="ov-head"><div><div class="eyebrow">Réseau de la maison</div><h2>Qui contient quoi</h2></div><button class="x" id="ovx" type="button" aria-label="Fermer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="net" id="net"></div>
+    <div class="legend"><span>Orange : le serveur physique et Proxmox</span><span>Bleu : machine virtuelle</span><span>Violet : conteneur</span><span>Pointillés : appareils en Wi-Fi ou via le cloud</span></div>
+  </div>
 </div>
 
 <script>
@@ -120,13 +161,55 @@ function subline(s, d) {
   return s.externe ? 'Accès depuis internet' : 'Appareil du réseau';
 }
 
+function logoHtml(s, size) {
+  const c = COLORS[s.icone] || COLORS.monde;
+  const img = s.logo ? `<img class="logo" alt="" src="${LOGOS}/svg/${esc(s.logo)}.svg" data-png="${LOGOS}/png/${esc(s.logo)}.png" onerror="if(this.dataset.png){this.src=this.dataset.png;this.dataset.png='';}else{this.replaceWith(document.createRange().createContextualFragment(window.svgFor('${esc(s.icone)}')));}">` : svg(s.icone, size);
+  return `<span class="ico" style="--c:${c[0]};--ic:${c[1]}">${img}</span>`;
+}
+const stateHtml = (s) => `<span class="state ${s.externe ? '' : s.ok === true ? 'ok' : s.ok === false ? 'ko' : ''}"><i></i><span>${s.externe ? 'cloud' : s.ok === true ? 'en ligne' : s.ok === false ? 'hors ligne' : ''}</span></span>`;
+const host = (u) => { try { const x = new URL(u); return x.host; } catch (e) { return ''; } };
+let lastData = null;
+function drawNet() {
+  const d = lastData; if (!d) return;
+  const sv = d.services || [], n = d.noeud || {};
+  const px = sv.find((s) => s.noeud) || { nom: 'Proxmox', icone: 'serveur' };
+  const guests = sv.filter((s) => s.vmid != null);
+  (d.machines || []).forEach((m) => { if (!guests.some((g) => g.vmid === m.vmid)) guests.push({ nom: m.name, vmid: m.vmid, icone: 'serveur', url: '' }); });
+  const devs = sv.filter((s) => !s.noeud && s.vmid == null && s.id !== 'nabu');
+  const g = guests.map((s) => {
+    const m = (d.machines || []).find((x) => x.vmid === s.vmid);
+    const lxc = m ? m.type === 'lxc' : true;
+    const on = m && m.status === 'running';
+    return `<div class="node guest" style="--gc:${lxc ? '#B9A8FF' : '#5CC8FF'}">${logoHtml(s, 20)}<div style="min-width:0"><b>${esc(s.nom)}</b><code>${esc(host(s.url) || '–')}</code><small>${m ? (lxc ? 'Conteneur ' : 'VM ') + m.vmid + (m.name ? ' · ' + esc(m.name) : '') : 'pas encore installé'}${on ? ' · ' + Math.round((m.cpu || 0) * 100) + ' % · ' + Gn(m.mem) + '/' + Go(m.maxmem) : ''}</small></div><span class="state ${on ? 'ok' : m ? 'ko' : ''}"><i></i></span></div>`;
+  }).join('');
+  const dv = devs.map((s) => `<div class="node">${logoHtml(s, 20)}<div style="min-width:0"><b>${esc(s.nom)}</b><code>${esc(host(s.url) || (s.externe ? 'cloud' : 'réseau local'))}</code>${s.note ? `<small>${esc(s.note)}</small>` : ''}</div>${stateHtml(s)}</div>`).join('');
+  $('net').innerHTML = `
+    <div class="node">${logoHtml({ icone: 'monde' }, 20)}<div><b>Internet</b><small>Accès à distance : Nabu Casa</small></div></div>
+    <div class="vline"></div>
+    <div class="node">${logoHtml({ icone: 'lien', logo: 'google-wifi' }, 20)}<div><b>Box Google Wifi</b><code>192.168.86.1</code><small>Routeur et Wi-Fi · réseau 192.168.86.x</small></div></div>
+    <div class="vline"></div>
+    <div class="branches">
+      <div class="host">
+        <div class="host-h">${logoHtml(px, 20)}<div style="min-width:0"><div class="lbl">Serveur physique · Dell OptiPlex 3000</div><b>${esc(px.nom)}</b> <code>${esc(host(px.url) || '')}</code><small>${esc((n.modele || '').replace(/\(R\)|\(TM\)|CPU|@.*$/g, '').trim())}${n.memTotal ? ' · ' + Go(n.memTotal) + ' de mémoire' : ''}${n.cpu != null ? ' · processeur ' + Math.round(n.cpu * 100) + ' %' : ''}</small></div></div>
+        <div class="lbl">Machines hébergées</div>
+        <div class="guests">${g}</div>
+      </div>
+      <div class="wifi"><div class="lbl">Autres appareils</div><div class="devs">${dv}</div></div>
+    </div>`;
+}
+$('gear').addEventListener('click', () => { $('ov').hidden = false; drawNet(); });
+$('ovx').addEventListener('click', () => { $('ov').hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('ov').hidden = true; });
+
 let built = '';
 function render(d) {
+  lastData = d;
+  if (!$('ov').hidden) drawNet();
   $('err').hidden = !d.erreur;
   if (d.erreur) $('err').textContent = 'Le serveur Proxmox ne répond pas (' + d.erreur + '). Les raccourcis restent utilisables.';
   const n = d.noeud;
   if (n) $('sub').textContent = `Proxmox ${n.version ? (n.version.split('/')[1] || '') : ''} · ${(d.machines || []).filter((m) => m.status === 'running').length} machines en marche`;
-  const sv = d.services || [];
+  const sv = (d.services || []).filter((s) => s.tuile !== false);
   const key = sv.map((s) => s.id).join('|');
   if (key !== built) {
     built = key;

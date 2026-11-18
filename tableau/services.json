@@ -50,5 +50,22 @@
     "icone": "monde",
     "externe": true,
     "logo": "home-assistant"
+  },
+  {
+    "id": "hue",
+    "nom": "Pont Philips Hue",
+    "icone": "lien",
+    "logo": "philips-hue",
+    "tuile": false,
+    "note": "Lumières, détecteur de mouvement"
+  },
+  {
+    "id": "netatmo",
+    "nom": "Netatmo",
+    "icone": "monde",
+    "logo": "netatmo",
+    "tuile": false,
+    "externe": true,
+    "note": "Sonnette, caméra jardin, thermostat (via le cloud)"
   }
 ]
