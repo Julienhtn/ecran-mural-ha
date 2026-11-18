@@ -33,8 +33,7 @@
     "id": "tablette",
     "nom": "Tablette (Fully)",
     "url": "http://192.168.86.15:2323",
-    "icone": "tablette",
-    "logo": "fully-kiosk-browser"
+    "icone": "tablette"
   },
   {
     "id": "garage",
